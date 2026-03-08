@@ -1,0 +1,2189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sports Misery Calculator — How Much Have Your Teams Hurt You?</title>
+  <meta name="description" content="Calculate your lifetime sports misery score. How much pain have your teams put you through since you became a fan?" />
+  <meta property="og:title" content="Sports Misery Calculator" />
+  <meta property="og:description" content="How much pain have your teams put you through?" />
+  <meta property="og:type" content="website" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0e0b08;
+      --surface:   #181310;
+      --card:      #201a15;
+      --card2:     #261f19;
+      --border:    #2e2620;
+      --border2:   #3a3028;
+      --text:      #f0e6d8;
+      --muted:     #8a7864;
+      --muted2:    #6a5a48;
+      --accent:    #e05a20;
+      --accent2:   #f07840;
+      --accent-glow: rgba(224,90,32,0.18);
+      --green:     #4ecb7a;
+      --yellow:    #f0c040;
+      --red:       #e03840;
+      --radius:    12px;
+      --radius-sm: 7px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      /* Film grain overlay */
+      position: relative;
+    }
+
+    /* Grain texture via SVG filter */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.038;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 128px 128px;
+      mix-blend-mode: overlay;
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.9rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(14,11,8,0.92);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .site-name {
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: var(--text);
+    }
+
+    .site-name span {
+      color: var(--accent);
+    }
+
+    .header-tagline {
+      font-size: 0.75rem;
+      color: var(--muted);
+      display: none;
+    }
+
+    @media (min-width: 540px) { .header-tagline { display: block; } }
+
+    /* ── HERO ────────────────────────────────────────── */
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      min-height: 52vh;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    @media (max-width: 720px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+    }
+
+    .hero-left {
+      padding: 3rem 2rem 3rem 2rem;
+      background: linear-gradient(135deg, #1a0f08 0%, var(--bg) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      border-right: 1px solid var(--border);
+    }
+
+    /* Warm glow behind text */
+    .hero-left::before {
+      content: '';
+      position: absolute;
+      top: -40px; left: -40px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(224,90,32,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-kicker {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .hero-kicker::before {
+      content: '';
+      display: block;
+      width: 24px; height: 2px;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .hero-title {
+      font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+      font-weight: 900;
+      letter-spacing: -1px;
+      line-height: 1.08;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .hero-title em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero-sub {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.7;
+      max-width: 380px;
+    }
+
+    /* Right side: examples + quick-enter CTA */
+    .hero-right {
+      padding: 2rem 1.75rem;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* year-block inside hero has no divider line */
+    .hero-right .year-block {
+      border-bottom: none;
+      padding-bottom: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .example-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.7rem 1rem;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.18s, background 0.18s;
+      text-decoration: none;
+    }
+
+    .example-row:hover {
+      border-color: var(--accent);
+      background: var(--card2);
+    }
+
+    .ex-info { display: flex; flex-direction: column; gap: 0.1rem; }
+    .ex-fan  { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+    .ex-teams { font-size: 0.7rem; color: var(--muted); }
+
+    .ex-badge {
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 30px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .ex-badge.bad  { background: rgba(224,56,64,0.15); color: var(--red);   border: 1px solid rgba(224,56,64,0.3); }
+    .ex-badge.meh  { background: rgba(240,192,64,0.15); color: var(--yellow); border: 1px solid rgba(240,192,64,0.3); }
+    .ex-badge.good { background: rgba(78,203,122,0.15); color: var(--green);  border: 1px solid rgba(78,203,122,0.3); }
+
+    .hero-cta {
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .hero-cta-arrow { color: var(--accent); }
+
+    /* ── MAIN LAYOUT ─────────────────────────────────── */
+    .app-grid {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 5rem;
+    }
+
+    /* ── EXAMPLES STRIP ──────────────────────────────── */
+    .examples-strip {
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .examples-strip-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .examples-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted2);
+      margin-right: 0.25rem;
+      white-space: nowrap;
+    }
+
+    .example-chip {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.28rem 0.75rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      color: var(--text);
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+
+    .example-chip:hover { border-color: var(--accent); background: var(--card2); }
+
+    /* ── HERO INPUT PANEL ────────────────────────────── */
+    .hero-input-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: center;
+    }
+
+    .section-label-sm {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 0.6rem;
+    }
+
+    /* ── PER-LEAGUE YEAR CUSTOMIZATION ──────────────── */
+    .year-toggle-link {
+      display: inline-block;
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-decoration: none;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      margin-top: 0.35rem;
+      transition: color 0.15s;
+    }
+
+    .year-toggle-link:hover { color: var(--accent); }
+
+    /* Container for per-league sliders — hidden by default */
+    .per-league-years {
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .per-league-years.open { display: flex; }
+
+    .league-year-row {
+      display: grid;
+      grid-template-columns: 28px 1fr 36px;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .league-year-emoji {
+      font-size: 0.88rem;
+      line-height: 1;
+    }
+
+    .league-year-val {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Year slider */
+    .year-block {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .year-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.65rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .year-value {
+      font-size: 3rem;
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+
+    .year-context {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 3px;
+      border-radius: 2px;
+      background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--pct,50%), var(--border2) var(--pct,50%));
+      outline: none;
+      cursor: pointer;
+      margin-bottom: 0.4rem;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(224,90,32,0.22);
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      box-shadow: 0 0 0 3px rgba(224,90,32,0.22);
+    }
+
+    .range-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: var(--muted2);
+    }
+
+    /* Team selects */
+    .field-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+      display: block;
+    }
+
+    .label-nfl { color: #6a9fd4 !important; }
+    .label-nba { color: #d46a6a !important; }
+    .label-mlb { color: #d4a06a !important; }
+    .label-nhl { color: #6ac8d4 !important; }
+
+    .teams-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      margin-bottom: 1.25rem;
+    }
+
+    select {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 0.55rem 0.75rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.18s;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a7864' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      padding-right: 2rem;
+    }
+
+    select:focus { border-color: var(--accent); }
+    select option { background: #201a15; }
+
+    .btn-calculate {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.18s, transform 0.12s;
+      letter-spacing: 0.01em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-calculate::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+    }
+
+    .btn-calculate:hover:not(:disabled) {
+      background: var(--accent2);
+      transform: translateY(-1px);
+    }
+
+    .btn-calculate:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .error-msg {
+      color: var(--red);
+      font-size: 0.82rem;
+      margin-top: 0.6rem;
+      display: none;
+      text-align: center;
+    }
+
+    /* ── RESULTS COLUMN ─────────────────────────────── */
+    .results-col {}
+
+    /* Team cards grid: side-by-side on desktop, stacked on mobile */
+    #team-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.85rem;
+    }
+
+    /* Single team stays full width */
+    #team-cards:has(> .team-card:only-child) {
+      grid-template-columns: 1fr;
+    }
+
+    @media (max-width: 680px) {
+      #team-cards { grid-template-columns: 1fr; }
+    }
+
+    /* Empty state */
+    .empty-state {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty-state-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-state p { font-size: 0.88rem; line-height: 1.65; }
+
+    /* ── VERDICT ─────────────────────────────────────── */
+    #results { display: none; }
+
+    .verdict {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem 1.75rem 1.75rem;
+      text-align: center;
+      margin-bottom: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .verdict::before {
+      content: '';
+      position: absolute;
+      top: -60px; left: 50%;
+      transform: translateX(-50%);
+      width: 280px; height: 180px;
+      background: radial-gradient(ellipse, rgba(224,90,32,0.14) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .verdict-eyebrow {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.85rem;
+    }
+
+    .verdict-emoji {
+      font-size: 3.2rem;
+      line-height: 1;
+      margin-bottom: 0.4rem;
+      display: block;
+    }
+
+    .verdict-label {
+      font-size: clamp(1.4rem, 4vw, 1.9rem);
+      font-weight: 900;
+      letter-spacing: -0.4px;
+      line-height: 1.15;
+      margin-bottom: 0.6rem;
+    }
+
+    .verdict-score-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 0.45rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .verdict-score {
+      font-size: clamp(2.2rem, 7vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+
+    .verdict-unit { font-size: 0.8rem; color: var(--muted); }
+
+    .verdict-percentile {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .verdict-percentile strong { color: var(--text); }
+
+    /* Gauge */
+    .gauge-wrap { margin: 0 auto 1.5rem; max-width: 420px; }
+
+    .gauge-track {
+      height: 8px;
+      background: var(--surface);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.45rem;
+      border: 1px solid var(--border);
+    }
+
+    .gauge-fill {
+      height: 100%;
+      width: 3%;
+      border-radius: 4px;
+      transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+      background: linear-gradient(90deg, var(--green) 0%, var(--yellow) 40%, var(--accent) 70%, var(--red) 100%);
+      background-size: 420px 100%;
+    }
+
+    .gauge-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.64rem;
+      color: var(--muted2);
+    }
+
+    /* Share buttons */
+    .verdict-actions {
+      display: flex;
+      gap: 0.6rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-share {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.15rem;
+      border-radius: 30px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      transition: background 0.18s, transform 0.12s;
+    }
+
+    .btn-share:hover { background: var(--accent2); transform: translateY(-1px); }
+
+    .btn-copylink {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.15rem;
+      border-radius: 30px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text);
+      transition: border-color 0.18s, transform 0.12s;
+    }
+
+    .btn-copylink:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+    /* ── TEAM CARDS ──────────────────────────────────── */
+    .section-heading {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .section-heading::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .team-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      animation: fadeUp 0.35s ease both;
+    }
+
+    .team-card:nth-child(2) { animation-delay: 0.07s; }
+    .team-card:nth-child(3) { animation-delay: 0.14s; }
+    .team-card:nth-child(4) { animation-delay: 0.21s; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .league-pill {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.18rem 0.55rem;
+      border-radius: 30px;
+      flex-shrink: 0;
+    }
+
+    .league-pill.nfl { background: rgba(106,159,212,0.15); color: #6a9fd4; border: 1px solid rgba(106,159,212,0.28); }
+    .league-pill.nba { background: rgba(212,106,106,0.15); color: #d46a6a; border: 1px solid rgba(212,106,106,0.28); }
+    .league-pill.mlb { background: rgba(212,160,106,0.15); color: #d4a06a; border: 1px solid rgba(212,160,106,0.28); }
+    .league-pill.nhl { background: rgba(106,200,212,0.15); color: #6ac8d4; border: 1px solid rgba(106,200,212,0.28); }
+
+    .card-team-name { font-weight: 700; font-size: 1rem; flex: 1; min-width: 0; }
+
+    .card-score-pill {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.22rem 0.65rem;
+      border-radius: 30px;
+      flex-shrink: 0;
+    }
+
+    .card-score-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.85rem;
+    }
+    .score-summary-main { display: flex; flex-direction: column; }
+    .score-summary-val  { font-size: 1.9rem; font-weight: 900; line-height: 1; }
+    .score-summary-lbl  { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.2rem; }
+    .score-summary-sub  { display: flex; flex-direction: column; align-items: flex-end; }
+    .score-summary-val2 { font-size: 1.1rem; font-weight: 800; line-height: 1; color: var(--muted); }
+
+    .card-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 420px) { .card-stats { grid-template-columns: repeat(3,1fr); } }
+
+    .stat-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.5rem 0.4rem;
+      text-align: center;
+    }
+
+    .stat-val { display: block; font-size: 1.05rem; font-weight: 800; line-height: 1.2; }
+    .stat-lbl { display: block; font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.1rem; }
+
+    .card-highlights {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+      margin-bottom: 0.85rem;
+    }
+
+    @media (max-width: 420px) { .card-highlights { grid-template-columns: 1fr; } }
+
+    .card-highlight {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.55rem 0.75rem;
+    }
+
+    .hl-label { display: block; font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.15rem; }
+    .hl-val   { display: block; font-size: 0.88rem; font-weight: 700; }
+    .hl-pts   { color: var(--red); font-size: 0.76rem; }
+
+    /* Timeline */
+    .timeline-label { font-size: 0.62rem; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
+
+    .timeline-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 1px;
+      height: 48px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 3px 3px 0;
+      overflow: hidden;
+    }
+
+    .tl-bar {
+      flex: 1;
+      min-width: 2px;
+      border-radius: 2px 2px 0 0;
+      height: 0%;
+      transition: height 0.85s cubic-bezier(0.4,0,0.2,1);
+      cursor: default;
+    }
+
+    .timeline-axis {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.6rem;
+      color: var(--muted2);
+      margin-top: 0.25rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .card-footer { font-size: 0.75rem; color: var(--muted); line-height: 1.85; }
+
+    /* ── COMPARISON TABLE ────────────────────────────── */
+    #comparison {
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .table-wrap { overflow-x: auto; margin-top: 0.65rem; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+
+    th, td {
+      padding: 0.5rem 0.75rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th { font-size: 0.66rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    td.row-label { text-align: left; color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+    .cell-worst { color: var(--red); font-weight: 700; }
+    tr.total-row td { background: rgba(224,90,32,0.08); border-top: 2px solid var(--accent); font-weight: 700; }
+
+    .btn-reset {
+      display: block;
+      width: 100%;
+      margin-top: 0.5rem;
+      padding: 0.7rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.18s, color 0.18s;
+    }
+
+    .btn-reset:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── STICKY RANK BAR ─────────────────────────────── */
+    #sticky-rank-bar {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 200;
+      background: linear-gradient(90deg, #1a1008, #201408);
+      border-top: 1px solid var(--accent);
+      padding: 0.75rem 1.25rem;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+      animation: slideUp 0.35s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .sticky-rank-inner {
+      max-width: 680px; margin: 0 auto;
+      display: flex; align-items: center; gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .sticky-rank-text {
+      flex: 1; min-width: 180px;
+      font-size: 0.88rem; color: var(--text); line-height: 1.35;
+    }
+    .sticky-rank-text strong { color: var(--accent); font-size: 1rem; }
+    .sticky-rank-mystery {
+      display: inline-block;
+      background: var(--accent);
+      color: transparent; /* hide text */
+      border-radius: 4px;
+      padding: 0 0.5rem;
+      font-size: 1rem; font-weight: 900;
+      letter-spacing: 0.05em;
+      position: relative;
+      user-select: none;
+    }
+    .sticky-rank-mystery::after {
+      content: '??';
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 1rem; font-weight: 900;
+    }
+    .sticky-rank-form {
+      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
+    }
+    .sticky-rank-input {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); color: var(--text);
+      padding: 0.45rem 0.8rem; font-size: 0.82rem;
+      width: 200px; outline: none;
+    }
+    .sticky-rank-input:focus { border-color: var(--accent); }
+    .sticky-rank-btn {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: var(--radius-sm); padding: 0.45rem 1rem;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer;
+      white-space: nowrap;
+    }
+    .sticky-rank-btn:hover { background: var(--accent2); }
+    .sticky-rank-close {
+      background: none; border: none; color: var(--muted2);
+      cursor: pointer; font-size: 1.1rem; padding: 0.2rem 0.3rem;
+      line-height: 1; flex-shrink: 0;
+    }
+    .sticky-rank-close:hover { color: var(--text); }
+
+    /* ── LEADERBOARD ─────────────────────────────────── */
+    #leaderboard-section {
+      display: none;
+      margin-top: 3rem;
+      padding: 0 1rem 4rem;
+    }
+
+    .lb-inner {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .lb-divider {
+      border: none; border-top: 1px solid var(--border);
+      margin: 0 0 2rem;
+    }
+    .lb-header { text-align: center; margin-bottom: 2rem; }
+    .lb-eyebrow {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 0.4rem;
+    }
+    .lb-title {
+      font-size: 1.6rem; font-weight: 900; color: var(--text);
+      margin-bottom: 0.4rem; line-height: 1.2;
+    }
+    .lb-subtitle { font-size: 0.85rem; color: var(--muted); }
+
+    /* Teaser */
+    .lb-teaser { margin-bottom: 0; }
+    .lb-teaser-label {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted2); margin-bottom: 0.6rem;
+    }
+    .lb-row {
+      display: grid;
+      grid-template-columns: 2rem 1fr auto auto;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 0.75rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 0.35rem;
+      font-size: 0.82rem;
+    }
+    .lb-row.is-you {
+      border-color: var(--accent);
+      background: rgba(224,90,32,0.08);
+    }
+    .lb-rank {
+      font-weight: 800; color: var(--muted);
+      font-size: 0.78rem; text-align: center;
+    }
+    .lb-rank.top1 { color: #f0c040; }
+    .lb-rank.top2 { color: #b0b8c8; }
+    .lb-rank.top3 { color: #cd7f32; }
+    .lb-name { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lb-teams { font-size: 0.72rem; color: var(--muted); }
+    .lb-score { font-weight: 800; color: var(--accent); font-size: 0.9rem; white-space: nowrap; }
+    .lb-you-badge {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent);
+      background: rgba(224,90,32,0.15); border-radius: 4px;
+      padding: 0.1rem 0.35rem;
+    }
+
+    /* Gate */
+    #lb-gate {
+      position: relative;
+      margin-top: -0.5rem;
+    }
+    .lb-gate-blur {
+      height: 80px;
+      background: linear-gradient(to bottom, transparent, var(--bg) 80%);
+      pointer-events: none;
+    }
+    .lb-gate-box {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 1.75rem 1.5rem;
+      text-align: center;
+    }
+    .lb-gate-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .lb-gate-heading {
+      font-size: 1.1rem; font-weight: 800; color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+    .lb-gate-sub {
+      font-size: 0.82rem; color: var(--muted);
+      margin-bottom: 1.1rem; max-width: 380px; margin-left: auto; margin-right: auto;
+    }
+    #lb-email-form {
+      display: flex; gap: 0.5rem; justify-content: center;
+      flex-wrap: wrap; margin-bottom: 0.6rem;
+    }
+    #lb-email-input {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); color: var(--text);
+      padding: 0.55rem 0.9rem; font-size: 0.85rem;
+      flex: 1; min-width: 200px; max-width: 280px;
+      outline: none;
+    }
+    #lb-email-input:focus { border-color: var(--accent); }
+    .lb-submit-btn {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: var(--radius-sm); padding: 0.55rem 1.2rem;
+      font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .lb-submit-btn:hover { background: var(--accent2); }
+    .lb-gate-fine { font-size: 0.68rem; color: var(--muted2); }
+
+    /* Full list */
+    .lb-your-rank {
+      background: rgba(224,90,32,0.1); border: 1px solid var(--accent);
+      border-radius: var(--radius-sm); padding: 0.7rem 1rem;
+      font-size: 0.85rem; color: var(--text); margin-bottom: 1rem;
+      text-align: center; font-weight: 600;
+    }
+    .lb-list-header {
+      display: grid;
+      grid-template-columns: 2rem 1fr auto auto;
+      gap: 0.5rem;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted2);
+      margin-bottom: 0.3rem;
+    }
+
+    /* ── SHARE MODAL ─────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      backdrop-filter: blur(6px);
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .share-modal {
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+
+    /* The shareable card */
+    .share-card {
+      background: linear-gradient(150deg, #1e0e06 0%, #120a04 50%, #0a0e18 100%);
+      padding: 1.75rem 1.75rem 1.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .share-card::before {
+      content: '';
+      position: absolute;
+      top: -50px; left: 50%;
+      transform: translateX(-50%);
+      width: 260px; height: 200px;
+      background: radial-gradient(ellipse, rgba(224,90,32,0.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Decorative corner lines */
+    .share-card::after {
+      content: '';
+      position: absolute;
+      inset: 8px;
+      border: 1px solid rgba(224,90,32,0.15);
+      border-radius: 6px;
+      pointer-events: none;
+    }
+
+    .share-card-eyebrow {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(224,90,32,0.6);
+      margin-bottom: 1rem;
+    }
+
+    .share-card-emoji { font-size: 3rem; line-height: 1; margin-bottom: 0.4rem; display: block; }
+
+    .share-card-label {
+      font-size: 1.4rem;
+      font-weight: 900;
+      letter-spacing: -0.3px;
+      color: #f0e6d8;
+      margin-bottom: 0.4rem;
+    }
+
+    .share-card-score {
+      font-size: 2.6rem;
+      font-weight: 900;
+      letter-spacing: -2px;
+      line-height: 1;
+      margin-bottom: 0.2rem;
+    }
+
+    .share-card-unit { font-size: 0.72rem; color: rgba(240,230,216,0.35); margin-bottom: 0.85rem; }
+
+    .share-card-teams {
+      display: flex;
+      justify-content: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.85rem;
+    }
+
+    .share-card-team {
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(240,230,216,0.06);
+      border: 1px solid rgba(240,230,216,0.12);
+      border-radius: 30px;
+      padding: 0.2rem 0.55rem;
+      color: rgba(240,230,216,0.7);
+    }
+
+    .share-card-percentile { font-size: 0.75rem; color: rgba(240,230,216,0.4); }
+
+    .share-card-watermark {
+      font-size: 0.58rem;
+      color: rgba(240,230,216,0.18);
+      margin-top: 1rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .share-modal-actions {
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-copy-link-modal {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      transition: background 0.18s;
+    }
+
+    .btn-copy-link-modal:hover { background: var(--accent2); }
+
+    .btn-close-modal {
+      width: 100%;
+      padding: 0.7rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      transition: border-color 0.18s, color 0.18s;
+    }
+
+    .btn-close-modal:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── TOAST ───────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 1.75rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(1rem);
+      background: var(--card2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 0.6rem 1.25rem;
+      border-radius: 30px;
+      font-size: 0.84rem;
+      opacity: 0;
+      transition: opacity 0.28s, transform 0.28s;
+      pointer-events: none;
+      z-index: 300;
+      white-space: nowrap;
+    }
+
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── MOBILE ──────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .hero-left { padding: 2rem 1.25rem; }
+      .hero-right { padding: 1.5rem 1.25rem; }
+      .app-grid { padding: 1.25rem 1rem 4rem; gap: 1rem; }
+      .input-panel { padding: 1.25rem; }
+      .verdict { padding: 1.5rem 1.25rem 1.25rem; }
+      .team-card { padding: 1rem; }
+      .card-highlights { grid-template-columns: 1fr; }
+      .verdict-actions { flex-direction: column; }
+      .btn-share, .btn-copylink { justify-content: center; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── STICKY HEADER ─────────────────────────────── -->
+<header>
+  <div class="site-name">Suffer<span>Score</span></div>
+  <div class="header-tagline">Your lifetime sports pain, quantified</div>
+</header>
+
+<!-- ── HERO ─────────────────────────────────────────── -->
+<div class="hero">
+  <div class="hero-left">
+    <div class="hero-kicker">The Sports Pain Index</div>
+    <h1 class="hero-title">Quantifying decades of <em>disappointment.</em></h1>
+    <p class="hero-sub">Pick your teams and the year you started watching. We score every season since, from championships to catastrophic collapses, and compute your misery score.</p>
+  </div>
+
+  <div class="hero-right">
+    <div class="hero-input-panel">
+      <div class="year-block">
+        <div class="section-label-sm">My earliest sports memory</div>
+
+        <!-- Global year (shown when not customized) -->
+        <div id="global-year-block">
+          <div class="year-row">
+            <div class="year-value" id="year-display">1990</div>
+            <div class="year-context" id="year-context"></div>
+          </div>
+          <input type="range" id="fan-start-year" min="1950" max="2020" value="1990" step="1" />
+          <div class="range-labels">
+            <span>1950</span><span>1970</span><span>1990</span><span>2010</span><span>'20</span>
+          </div>
+          <button class="year-toggle-link" id="btn-customize-years">
+            Different year per team →
+          </button>
+        </div>
+
+        <!-- Per-league sliders (shown when customized) -->
+        <div class="per-league-years" id="per-league-years">
+          <button class="year-toggle-link" id="btn-uncustomize-years" style="margin-top:0;margin-bottom:0.25rem">
+            ← Use one year for all
+          </button>
+          <!-- Rows injected by JS based on selected teams -->
+        </div>
+      </div>
+
+      <div class="section-label-sm" style="margin-bottom:0.75rem">My teams</div>
+      <div class="teams-stack">
+        <div>
+          <label class="field-label label-nfl" for="nfl-team">🏈 NFL</label>
+          <select id="nfl-team"><option value="">— Not a Fan —</option></select>
+        </div>
+        <div>
+          <label class="field-label label-nba" for="nba-team">🏀 NBA</label>
+          <select id="nba-team"><option value="">— Not a Fan —</option></select>
+        </div>
+        <div>
+          <label class="field-label label-mlb" for="mlb-team">⚾ MLB</label>
+          <select id="mlb-team"><option value="">— Not a Fan —</option></select>
+        </div>
+        <div>
+          <label class="field-label label-nhl" for="nhl-team">🏒 NHL</label>
+          <select id="nhl-team"><option value="">— Not a Fan —</option></select>
+        </div>
+      </div>
+
+      <button class="btn-calculate" id="btn-calculate">Calculate My Misery →</button>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── EXAMPLES STRIP ────────────────────────────────── -->
+<div class="examples-strip">
+  <div class="examples-strip-inner">
+    <span class="examples-label">Try these:</span>
+    <a class="example-chip" href="?start=1995&nfl=CLE" onclick="loadExample(event,this)">💀 Browns since '95</a>
+    <a class="example-chip" href="?start=1988&nfl=BUF&nhl=BUF" onclick="loadExample(event,this)">😭 Bills + Sabres since '88</a>
+    <a class="example-chip" href="?start=2004&nba=GSW" onclick="loadExample(event,this)">😤 Warriors since '04</a>
+    <a class="example-chip" href="?start=1995&nfl=NE" onclick="loadExample(event,this)">👑 Patriots since '95</a>
+  </div>
+</div>
+
+<!-- ── APP GRID ──────────────────────────────────────── -->
+<div class="app-grid">
+
+  <!-- Left: results -->
+  <div class="results-col">
+
+    <div class="empty-state" id="empty-state">
+      <div class="empty-state-icon">🏟️</div>
+      <p>Select your teams above and hit Calculate. We'll tally every season of suffering since you became a fan.</p>
+    </div>
+
+    <div id="results">
+      <!-- Verdict -->
+      <div class="verdict">
+        <div class="verdict-eyebrow">Your Lifetime Misery Score</div>
+        <span class="verdict-emoji" id="verdict-emoji"></span>
+        <div class="verdict-label" id="verdict-label"></div>
+        <div class="verdict-score-row">
+          <div class="verdict-score" id="verdict-score"></div>
+          <div class="verdict-unit">pts</div>
+        </div>
+        <div class="verdict-percentile" id="verdict-percentile"></div>
+
+        <div class="gauge-wrap">
+          <div class="gauge-track"><div class="gauge-fill" id="gauge-fill"></div></div>
+          <div class="gauge-labels"><span>Joy 🎉</span><span>Neutral</span><span>Pain 💀</span></div>
+        </div>
+
+        <div class="verdict-actions">
+          <button class="btn-share" id="btn-share">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share My Score
+          </button>
+          <button class="btn-copylink" id="btn-copylink">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            Copy Link
+          </button>
+        </div>
+      </div>
+
+      <div class="section-heading">Team Breakdown</div>
+      <div id="team-cards"></div>
+
+      <div id="comparison">
+        <div class="section-heading" style="margin-top:0">Team by Team Analysis</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="comp-head"></tr></thead>
+            <tbody id="comp-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <button class="btn-reset" id="btn-reset">↺ Start Over</button>
+
+      <!-- ── LEADERBOARD ──────────────────────────────── -->
+      <div id="leaderboard-section" style="display:none; margin-top:2rem">
+        <div class="lb-divider"></div>
+        <div class="lb-header">
+          <div class="lb-eyebrow">Hall of Suffering</div>
+          <h2 class="lb-title">The Misery Leaderboard</h2>
+          <p class="lb-subtitle">How does your suffering stack up?</p>
+        </div>
+
+        <!-- Teaser: top 3 always visible -->
+        <div class="lb-teaser">
+          <div class="lb-teaser-label">Top scores</div>
+          <div id="lb-top3"></div>
+        </div>
+
+        <!-- Gate -->
+        <div id="lb-gate">
+          <div class="lb-gate-blur"></div>
+          <div class="lb-gate-box">
+            <div class="lb-gate-icon">📊</div>
+            <div class="lb-gate-heading">See where you rank</div>
+            <p class="lb-gate-sub">Enter your email to unlock the full leaderboard and get notified when you move up the ranks.</p>
+            <form id="lb-email-form" autocomplete="off">
+              <input type="email" id="lb-email-input" placeholder="your@email.com" required />
+              <button type="submit" class="lb-submit-btn">Unlock Leaderboard</button>
+            </form>
+            <p class="lb-gate-fine">No spam. We'll only email you about leaderboard changes.</p>
+          </div>
+        </div>
+
+        <!-- Full leaderboard (shown after email) -->
+        <div id="lb-full" style="display:none">
+          <div class="lb-your-rank" id="lb-your-rank"></div>
+          <div class="lb-list-wrap">
+            <div class="lb-list-header">
+              <span>#</span><span>Fan</span><span>Teams</span><span>Score</span>
+            </div>
+            <div id="lb-rows"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ── STICKY RANK BAR ───────────────────────────────── -->
+<div id="sticky-rank-bar">
+  <div class="sticky-rank-inner">
+    <div class="sticky-rank-text">
+      📊 You rank <span class="sticky-rank-mystery">??</span> out of <span id="sticky-total">—</span> fans &mdash; enter your email to reveal your rank.
+    </div>
+    <form class="sticky-rank-form" id="sticky-rank-form" autocomplete="off">
+      <input type="text"  class="sticky-rank-input" id="sticky-name-input"  placeholder="Display name (e.g. BrownsFan87)" required />
+      <input type="email" class="sticky-rank-input" id="sticky-email-input" placeholder="your@email.com" required />
+      <button type="submit" class="sticky-rank-btn">Reveal My Rank</button>
+    </form>
+    <button class="sticky-rank-close" id="sticky-rank-close" title="Dismiss">✕</button>
+  </div>
+</div>
+
+<!-- ── SHARE MODAL ────────────────────────────────────── -->
+<div class="modal-backdrop" id="share-modal">
+  <div class="share-modal">
+    <div class="share-card">
+      <div class="share-card-eyebrow">SufferScore</div>
+      <span class="share-card-emoji" id="sc-emoji"></span>
+      <div class="share-card-label" id="sc-label"></div>
+      <div class="share-card-score" id="sc-score"></div>
+      <div class="share-card-unit">lifetime misery points</div>
+      <div class="share-card-teams" id="sc-teams"></div>
+      <div class="share-card-percentile" id="sc-percentile"></div>
+      <div class="share-card-watermark">sufferscore.com</div>
+    </div>
+    <div class="share-modal-actions">
+      <button class="btn-copy-link-modal" id="btn-copy-link-modal">🔗 Copy Shareable Link</button>
+      <button class="btn-close-modal" id="btn-close-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let lastData = null;
+
+// ─── INIT ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadTeams();
+  setupSlider();
+  document.getElementById('btn-calculate').addEventListener('click', calculate);
+  document.getElementById('btn-reset').addEventListener('click', reset);
+  document.getElementById('btn-share').addEventListener('click', openShareModal);
+  document.getElementById('btn-copylink').addEventListener('click', copyLink);
+  document.getElementById('btn-copy-link-modal').addEventListener('click', copyLink);
+  document.getElementById('btn-close-modal').addEventListener('click', closeShareModal);
+  document.getElementById('share-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('share-modal')) closeShareModal();
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('start')) {
+    const start = parseInt(params.get('start'));
+    if (start >= 1950 && start <= 2020) {
+      document.getElementById('fan-start-year').value = start;
+      updateSliderFill(document.getElementById('fan-start-year'));
+      updateYear(start);
+    }
+    await new Promise(r => setTimeout(r, 60));
+    const map = { nfl: 'nfl-team', nba: 'nba-team', mlb: 'mlb-team', nhl: 'nhl-team' };
+    for (const [key, id] of Object.entries(map)) {
+      const val = params.get(key);
+      if (val) {
+        const sel = document.getElementById(id);
+        if ([...sel.options].some(o => o.value === val)) sel.value = val;
+      }
+    }
+    await calculate();
+  }
+});
+
+// ─── TEAMS ────────────────────────────────────────────
+async function loadTeams() {
+  try {
+    const res = await fetch('/api/teams');
+    const all = await res.json();
+    const map = { NFL: 'nfl-team', NBA: 'nba-team', MLB: 'mlb-team', NHL: 'nhl-team' };
+    for (const [league, id] of Object.entries(map)) {
+      const sel = document.getElementById(id);
+      (all[league] || []).forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) { showError('Could not reach the server.'); }
+}
+
+// ─── SLIDER ───────────────────────────────────────────
+let customYearsActive = false;
+
+// Per-league year state — null means "use global"
+const leagueYears = { NFL: null, NBA: null, MLB: null, NHL: null };
+const LEAGUE_META = {
+  NFL: { emoji: '🏈', id: 'nfl-team' },
+  NBA: { emoji: '🏀', id: 'nba-team' },
+  MLB: { emoji: '⚾', id: 'mlb-team' },
+  NHL: { emoji: '🏒', id: 'nhl-team' },
+};
+
+function setupSlider() {
+  const slider = document.getElementById('fan-start-year');
+  slider.addEventListener('input', () => {
+    updateSliderFill(slider);
+    updateYear(+slider.value);
+    // If per-league active, sync any leagues still at the old global value
+    if (customYearsActive) syncPerLeagueToGlobal();
+  });
+  updateSliderFill(slider);
+  updateYear(+slider.value);
+
+  document.getElementById('btn-customize-years')
+    .addEventListener('click', openPerLeague);
+  document.getElementById('btn-uncustomize-years')
+    .addEventListener('click', closePerLeague);
+
+  // When team selection changes while per-league is open, rebuild rows
+  ['nfl-team','nba-team','mlb-team','nhl-team'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      if (customYearsActive) buildPerLeagueRows();
+    });
+  });
+}
+
+function updateSliderFill(slider) {
+  const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+  slider.style.setProperty('--pct', pct + '%');
+}
+
+function updateYear(y) {
+  document.getElementById('year-display').textContent = y;
+  const yrs = 2025 - y;
+  let ctx;
+  if      (y <= 1965) ctx = `OG fan · ${yrs} yrs`;
+  else if (y <= 1979) ctx = `Veteran · ${yrs} yrs`;
+  else if (y <= 1994) ctx = `Classic era · ${yrs} yrs`;
+  else if (y <= 2004) ctx = `Millennial · ${yrs} yrs`;
+  else if (y <= 2012) ctx = `Modern era · ${yrs} yrs`;
+  else                ctx = `Newer fan · ${yrs} yrs`;
+  document.getElementById('year-context').textContent = ctx;
+}
+
+// ─── PER-LEAGUE YEAR TOGGLE ───────────────────────────
+function openPerLeague() {
+  customYearsActive = true;
+  document.getElementById('global-year-block').style.display = 'none';
+  document.getElementById('per-league-years').classList.add('open');
+  buildPerLeagueRows();
+}
+
+function closePerLeague() {
+  customYearsActive = false;
+  // Reset league years
+  Object.keys(leagueYears).forEach(k => leagueYears[k] = null);
+  document.getElementById('global-year-block').style.display = 'block';
+  document.getElementById('per-league-years').classList.remove('open');
+}
+
+function syncPerLeagueToGlobal() {
+  // No-op: per-league sliders keep their own values once set
+}
+
+function buildPerLeagueRows() {
+  const globalYear = +document.getElementById('fan-start-year').value;
+  const container  = document.getElementById('per-league-years');
+
+  // Remove existing rows (keep the toggle button)
+  container.querySelectorAll('.league-year-row').forEach(r => r.remove());
+
+  let hasAny = false;
+  for (const [league, meta] of Object.entries(LEAGUE_META)) {
+    const sel = document.getElementById(meta.id);
+    if (!sel.value) continue; // skip leagues with no team selected
+    hasAny = true;
+
+    const current = leagueYears[league] ?? globalYear;
+    leagueYears[league] = current;
+
+    const row = document.createElement('div');
+    row.className = 'league-year-row';
+    row.dataset.league = league;
+
+    const pct = ((current - 1950) / (2020 - 1950)) * 100;
+
+    row.innerHTML = `
+      <span class="league-year-emoji">${meta.emoji}</span>
+      <input type="range"
+        min="1950" max="2020" step="1"
+        value="${current}"
+        style="--pct:${pct}%"
+        data-league="${league}" />
+      <span class="league-year-val" id="ly-val-${league}">${current}</span>
+    `;
+
+    // Wire up the slider
+    const slider = row.querySelector('input[type=range]');
+    slider.addEventListener('input', () => {
+      const y = +slider.value;
+      leagueYears[league] = y;
+      updateSliderFill(slider);
+      document.getElementById(`ly-val-${league}`).textContent = y;
+    });
+
+    container.appendChild(row);
+  }
+
+  // If no teams selected, show a hint
+  if (!hasAny) {
+    const hint = document.createElement('p');
+    hint.style.cssText = 'font-size:0.75rem;color:var(--muted);margin:0.25rem 0';
+    hint.textContent = 'Select at least one team first.';
+    container.appendChild(hint);
+  }
+}
+
+// Helper: get the effective start year for each league
+function getLeagueStartYears() {
+  const global = +document.getElementById('fan-start-year').value;
+  if (!customYearsActive) {
+    return { NFL: global, NBA: global, MLB: global, NHL: global };
+  }
+  return {
+    NFL: leagueYears.NFL ?? global,
+    NBA: leagueYears.NBA ?? global,
+    MLB: leagueYears.MLB ?? global,
+    NHL: leagueYears.NHL ?? global,
+  };
+}
+
+// ─── EXAMPLE CLICK ───────────────────────────────────
+async function loadExample(e, el) {
+  e.preventDefault();
+  const url    = new URL(el.href);
+  const params = url.searchParams;
+
+  // Reset per-league mode when loading an example
+  if (customYearsActive) closePerLeague();
+
+  const start = parseInt(params.get('start') || '1990');
+  document.getElementById('fan-start-year').value = start;
+  updateSliderFill(document.getElementById('fan-start-year'));
+  updateYear(start);
+
+  ['nfl','nba','mlb','nhl'].forEach(k => {
+    const sel = document.getElementById(k + '-team');
+    sel.value = params.get(k) || '';
+  });
+
+  // Scroll to input panel
+  document.querySelector('.app-grid').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  await new Promise(r => setTimeout(r, 400));
+  await calculate();
+}
+
+// ─── CALCULATE ────────────────────────────────────────
+async function calculate() {
+  const fanStart   = +document.getElementById('fan-start-year').value;
+  const starts     = getLeagueStartYears();
+  const nfl = document.getElementById('nfl-team').value;
+  const nba = document.getElementById('nba-team').value;
+  const mlb = document.getElementById('mlb-team').value;
+  const nhl = document.getElementById('nhl-team').value;
+
+  if (!nfl && !nba && !mlb && !nhl) {
+    showError('Pick at least one team to calculate.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-calculate');
+  btn.textContent = 'Calculating…';
+  btn.disabled = true;
+  document.getElementById('error-msg').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fan_start_year: fanStart,
+        nfl_team:       nfl || null,
+        nba_team:       nba || null,
+        mlb_team:       mlb || null,
+        nhl_team:       nhl || null,
+        // Per-league years — backend falls back to fan_start_year if omitted
+        nfl_start_year: nfl ? starts.NFL : null,
+        nba_start_year: nba ? starts.NBA : null,
+        mlb_start_year: mlb ? starts.MLB : null,
+        nhl_start_year: nhl ? starts.NHL : null,
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Server error');
+    lastData = data;
+    render(data);
+    updateUrlParams(fanStart, nfl, nba, mlb, nhl);
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    btn.textContent = 'Calculate My Misery →';
+    btn.disabled = false;
+  }
+}
+
+// ─── RENDER ───────────────────────────────────────────
+function render(data) {
+  document.getElementById('empty-state').style.display = 'none';
+  const results = document.getElementById('results');
+  results.style.display = 'block';
+  setTimeout(() => results.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  setTimeout(() => initLeaderboard(), 400);
+  setTimeout(() => initStickyBar(), 1200);
+
+  const score       = data.total_score;
+  const totalSeasons = data.team_results.reduce((a, t) => a + t.seasons_watched, 0);
+  const perSeason   = score / Math.max(totalSeasons, 1);
+  const color       = scoreColor(perSeason);
+
+  document.getElementById('verdict-emoji').textContent = data.emoji;
+  document.getElementById('verdict-label').textContent  = data.label;
+  document.getElementById('verdict-label').style.color  = color;
+  document.getElementById('verdict-score').textContent  = fmt(score);
+  document.getElementById('verdict-score').style.color  = color;
+
+  const pct = data.percentile;
+  if (pct) {
+    document.getElementById('verdict-percentile').innerHTML =
+      `More miserable than <strong>${pct.percentile}%</strong> of fans with similar teams`;
+  }
+
+  const gaugePct = Math.max(3, Math.min(97, 30 + (score / 2500) * 67));
+  setTimeout(() => { document.getElementById('gauge-fill').style.width = gaugePct + '%'; }, 120);
+
+  const container = document.getElementById('team-cards');
+  container.innerHTML = '';
+  data.team_results.forEach(t => container.appendChild(buildCard(t)));
+
+  data.team_results.length > 1
+    ? buildComparison(data.team_results)
+    : (document.getElementById('comparison').style.display = 'none');
+
+  setTimeout(() => {
+    document.querySelectorAll('.tl-bar[data-h]').forEach(b => { b.style.height = b.dataset.h + '%'; });
+  }, 380);
+}
+
+// ─── CARD ─────────────────────────────────────────────
+function buildCard(t) {
+  const card       = document.createElement('div');
+  card.className   = 'team-card';
+  const total      = t.total_score || 0;
+  const color      = scoreColor(total);
+  const playoffPct = t.seasons_watched > 0 ? Math.round((t.playoff_appearances / t.seasons_watched) * 100) : 0;
+  const worstYr    = t.worst_season?.year  || '—';
+  const worstPts   = t.worst_season?.score != null ? Math.round(t.worst_season.score)  : '—';
+  const bestYr     = t.best_season?.year   || '—';
+  const bestPts    = t.best_season?.score  != null ? Math.round(t.best_season.score)   : '—';
+  const bestIsChamp = t.championships?.includes(t.best_season?.year);
+
+  // Regular season record string
+  const reg = t.reg_record || {};
+  const regStr = reg.t > 0
+    ? `${reg.w}-${reg.l}-${reg.t}`
+    : `${reg.w || 0}-${reg.l || 0}`;
+
+  const pillBg  = s => s < 0 ? 'rgba(78,203,122,0.14)'  : s < 500 ? 'rgba(240,192,64,0.14)'  : 'rgba(224,56,64,0.14)';
+  const pillCol = s => s < 0 ? '#4ecb7a' : s < 500 ? '#f0c040' : '#e03840';
+  const pillBorder = s => s < 0 ? 'rgba(78,203,122,0.3)' : s < 500 ? 'rgba(240,192,64,0.3)' : 'rgba(224,56,64,0.3)';
+
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="league-pill ${t.league.toLowerCase()}">${t.league}</span>
+      <span class="card-team-name">${t.team_name}</span>
+    </div>
+    <div class="card-score-summary">
+      <div class="score-summary-main">
+        <span class="score-summary-val" style="color:${color}">${fmt(total)}</span>
+        <span class="score-summary-lbl">Total Misery Score</span>
+      </div>
+      <div class="score-summary-sub">
+        <span class="score-summary-val2">${(t.avg_score_per_season >= 0 ? '+' : '') + (t.avg_score_per_season || 0).toFixed(1)}</span>
+        <span class="score-summary-lbl">Per Season</span>
+      </div>
+    </div>
+    <div class="card-stats" style="grid-template-columns: repeat(3,1fr)">
+      <div class="stat-item">
+        <span class="stat-val">${t.seasons_watched}</span>
+        <span class="stat-lbl">Seasons</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val">${t.championships.length}</span>
+        <span class="stat-lbl">Titles</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val" style="font-size:0.95rem">${regStr}</span>
+        <span class="stat-lbl">Reg Season Record</span>
+      </div>
+    </div>
+    <div class="card-stats" style="grid-template-columns: repeat(3,1fr); margin-top:0.5rem">
+      <div class="stat-item">
+        <span class="stat-val">${t.playoff_appearances}</span>
+        <span class="stat-lbl">Playoff Apps</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val">${playoffPct}%</span>
+        <span class="stat-lbl">Playoff Rate</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val">${(t.championships?.length || 0) + (t.finals_losses?.length || 0)}</span>
+        <span class="stat-lbl">Finals Apps</span>
+      </div>
+    </div>
+    <div class="card-highlights">
+      <div class="card-highlight">
+        <span class="hl-label">Most Painful Year</span>
+        <span class="hl-val">${worstYr} <span class="hl-pts">+${worstPts} pts</span></span>
+      </div>
+      <div class="card-highlight">
+        <span class="hl-label">Best Year</span>
+        <span class="hl-val">${bestYr}${bestIsChamp ? ' 🏆' : ''} <span style="color:var(--green);font-size:0.72rem">${bestPts <= 0 ? bestPts : '+'+bestPts} pts</span></span>
+      </div>
+    </div>
+    ${buildTimeline(t)}
+    <div class="card-footer">
+      ${t.championships.length > 0 ? `🏆 <strong style="color:var(--text)">Championships:</strong> ${t.championships.join(', ')}<br>` : ''}
+      ${t.finals_losses.length   > 0 ? `💔 <strong style="color:var(--text)">Finals losses:</strong> ${t.finals_losses.join(', ')}` : ''}
+    </div>
+  `;
+  return card;
+}
+
+function buildTimeline(t) {
+  const tl = t.season_timeline;
+  if (!tl || Object.keys(tl).length === 0) return '';
+  const years  = Object.keys(tl).sort();
+  const scores = years.map(y => tl[y].score);
+  const maxAbs = Math.max(...scores.map(s => Math.abs(s)), 1);
+  const bars   = years.map(y => {
+    const s   = tl[y].score;
+    const pct = (Math.abs(s) / maxAbs * 100).toFixed(1);
+    const hb  = tl[y].heartbreak_desc || '';
+    const col = barColor(s);
+    const tip = hb ? `${y}: ${hb}` : `${y}: ${s >= 0 ? '+' : ''}${s.toFixed(0)} pts`;
+    return `<div class="tl-bar" style="background:${col}" data-h="${pct}" title="${tip.replace(/"/g,"'")}"></div>`;
+  }).join('');
+  const mid = years[Math.floor(years.length / 2)];
+  return `
+    <div class="timeline-label">Season-by-season</div>
+    <div class="timeline-bars">${bars}</div>
+    <div class="timeline-axis"><span>${years[0]}</span><span>${mid}</span><span>${years[years.length-1]}</span></div>
+  `;
+}
+
+// ─── COMPARISON ───────────────────────────────────────
+function buildComparison(teams) {
+  const el = document.getElementById('comparison');
+  el.style.display = 'block';
+  document.getElementById('comp-head').innerHTML =
+    '<th></th>' + teams.map(t => `<th>${t.team_name}</th>`).join('');
+  const rows = [
+    ['Avg / Season',  t => t.avg_score_per_season?.toFixed(1)],
+    ['Championships', t => t.championships.length],
+    ['Finals Losses', t => t.finals_losses.length],
+    ['Playoff Rate',  t => Math.round((t.playoff_appearances / t.seasons_watched) * 100) + '%'],
+    ['Worst Year',    t => `${t.worst_season?.year} (+${Math.round(t.worst_season?.score)})`],
+    ['Seasons',       t => t.seasons_watched],
+  ];
+  const body = document.getElementById('comp-body');
+  body.innerHTML = '';
+  rows.forEach(([label, fn]) => {
+    const vals   = teams.map(t => parseFloat(String(fn(t)).replace(/[^0-9.-]/g,'')) || 0);
+    const maxVal = Math.max(...vals);
+    const tr     = document.createElement('tr');
+    tr.innerHTML = `<td class="row-label">${label}</td>` +
+      teams.map((t, i) => `<td class="${vals[i]===maxVal&&teams.length>1?'cell-worst':''}">${fn(t)}</td>`).join('');
+    body.appendChild(tr);
+  });
+  const total = document.createElement('tr');
+  total.className = 'total-row';
+  const totals   = teams.map(t => t.total_score);
+  const maxTotal = Math.max(...totals);
+  total.innerHTML = `<td class="row-label">Total Score</td>` +
+    teams.map(t => `<td class="${t.total_score===maxTotal?'cell-worst':''}">${fmt(t.total_score)}</td>`).join('');
+  body.appendChild(total);
+}
+
+// ─── SHARE MODAL ──────────────────────────────────────
+function openShareModal() {
+  if (!lastData) return;
+  const data         = lastData;
+  const totalSeasons = data.team_results.reduce((a,t) => a + t.seasons_watched, 0);
+  const perSeason    = data.total_score / Math.max(totalSeasons, 1);
+  const color        = scoreColor(perSeason);
+
+  document.getElementById('sc-emoji').textContent = data.emoji;
+  document.getElementById('sc-label').textContent  = data.label;
+  document.getElementById('sc-label').style.color  = color;
+  document.getElementById('sc-score').textContent  = fmt(data.total_score);
+  document.getElementById('sc-score').style.color  = color;
+  document.getElementById('sc-teams').innerHTML    = data.team_results
+    .map(t => `<span class="share-card-team">${t.team_name}</span>`).join('');
+  const pct = data.percentile;
+  document.getElementById('sc-percentile').textContent =
+    pct ? `More miserable than ${pct.percentile}% of fans` : '';
+
+  document.getElementById('share-modal').classList.add('open');
+}
+
+function closeShareModal() { document.getElementById('share-modal').classList.remove('open'); }
+
+// ─── COPY LINK ────────────────────────────────────────
+function copyLink() {
+  const start = document.getElementById('fan-start-year').value;
+  const nfl   = document.getElementById('nfl-team').value;
+  const nba   = document.getElementById('nba-team').value;
+  const mlb   = document.getElementById('mlb-team').value;
+  const nhl   = document.getElementById('nhl-team').value;
+
+  const params = new URLSearchParams();
+  params.set('start', start);
+  if (nfl) params.set('nfl', nfl);
+  if (nba) params.set('nba', nba);
+  if (mlb) params.set('mlb', mlb);
+  if (nhl) params.set('nhl', nhl);
+
+  const url = `${window.location.origin}${window.location.pathname}?${params}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('Link copied — go make your friends feel seen.');
+    closeShareModal();
+  }).catch(() => {
+    const ta = Object.assign(document.createElement('textarea'), { value: url });
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Link copied!');
+    closeShareModal();
+  });
+}
+
+// ─── URL PARAMS ───────────────────────────────────────
+function updateUrlParams(start, nfl, nba, mlb, nhl) {
+  const p = new URLSearchParams();
+  p.set('start', start);
+  if (nfl) p.set('nfl', nfl);
+  if (nba) p.set('nba', nba);
+  if (mlb) p.set('mlb', mlb);
+  if (nhl) p.set('nhl', nhl);
+  window.history.replaceState({}, '', `${window.location.pathname}?${p}`);
+}
+
+// ─── RESET ────────────────────────────────────────────
+function reset() {
+  document.getElementById('results').style.display             = 'none';
+  document.getElementById('leaderboard-section').style.display = 'none';
+  document.getElementById('sticky-rank-bar').style.display     = 'none';
+  document.getElementById('empty-state').style.display         = 'block';
+  document.getElementById('team-cards').innerHTML              = '';
+  lastData = null;
+  window.history.replaceState({}, '', window.location.pathname);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─── LEADERBOARD ──────────────────────────────────────
+const LB_KEY       = 'smcLeaderboard';
+const LB_EMAIL_KEY = 'smcEmail';
+const LB_NAME_KEY  = 'smcName';
+const LB_MAX       = 100;
+
+function lbGetEntries() {
+  try { return JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch { return []; }
+}
+
+function lbSaveEntries(arr) {
+  localStorage.setItem(LB_KEY, JSON.stringify(arr));
+}
+
+function lbAddEntry(email, score, teams, fanStart, name) {
+  const entries = lbGetEntries();
+  const idx = entries.findIndex(e => e.email === email);
+  const entry = { email, name: name || email.split('@')[0], score, teams, fanStart, ts: Date.now() };
+  if (idx >= 0) {
+    if (score > entries[idx].score) entries[idx] = entry;
+    else if (name) entries[idx].name = name; // update name even if score isn't higher
+  } else {
+    entries.push(entry);
+  }
+  // Sort descending by score, keep top LB_MAX
+  entries.sort((a, b) => b.score - a.score);
+  lbSaveEntries(entries.slice(0, LB_MAX));
+}
+
+function lbRankOf(email) {
+  const entries = lbGetEntries();
+  const idx = entries.findIndex(e => e.email === email);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+function lbDisplayName(entry) {
+  return entry.name || entry.email.split('@')[0];
+}
+
+function renderLbRow(entry, rank, isYou) {
+  const rankClass = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+  const medals    = ['🥇','🥈','🥉'];
+  const rankLabel = rank <= 3 ? medals[rank-1] : `#${rank}`;
+  const teamStr   = (entry.teams || []).join(', ');
+  return `
+    <div class="lb-row${isYou ? ' is-you' : ''}">
+      <span class="lb-rank ${rankClass}">${rankLabel}</span>
+      <div>
+        <div class="lb-name">${lbDisplayName(entry)}${isYou ? ' <span class="lb-you-badge">You</span>' : ''}</div>
+        <div class="lb-teams">${teamStr} · since ${entry.fanStart}</div>
+      </div>
+      <span></span>
+      <span class="lb-score">${Math.round(entry.score).toLocaleString()}</span>
+    </div>`;
+}
+
+function renderLeaderboard(email) {
+  const entries = lbGetEntries();
+  const rank    = lbRankOf(email);
+
+  // Top 3 teaser (always visible)
+  const top3 = entries.slice(0, 3);
+  document.getElementById('lb-top3').innerHTML =
+    top3.map((e, i) => renderLbRow(e, i + 1, e.email === email)).join('');
+
+  if (!email) return; // gate still showing
+
+  // Your rank banner
+  document.getElementById('lb-your-rank').innerHTML = rank
+    ? `You rank <strong>#${rank}</strong> out of <strong>${entries.length}</strong> fans on the leaderboard.`
+    : `Your score has been added to the leaderboard.`;
+
+  // Full list (up to 50)
+  document.getElementById('lb-rows').innerHTML =
+    entries.slice(0, 50).map((e, i) => renderLbRow(e, i + 1, e.email === email)).join('');
+
+  document.getElementById('lb-gate').style.display = 'none';
+  document.getElementById('lb-full').style.display  = 'block';
+}
+
+function initLeaderboard() {
+  if (!lastData) return;
+
+  const section = document.getElementById('leaderboard-section');
+  section.style.display = 'block';
+
+  // Build team list for this submission
+  const teams    = (lastData.team_results || []).map(t => t.team_name);
+  const fanStart = document.getElementById('fan-start-year').value;
+  const score    = lastData.total_score || 0;
+
+  // Check if user already gave email
+  const savedEmail = localStorage.getItem(LB_EMAIL_KEY);
+  const savedName  = localStorage.getItem(LB_NAME_KEY);
+  if (savedEmail) {
+    lbAddEntry(savedEmail, score, teams, fanStart, savedName);
+    renderLeaderboard(savedEmail);
+  } else {
+    renderLeaderboard(null);
+  }
+
+  // Email form submit
+  document.getElementById('lb-email-form').onsubmit = function(e) {
+    e.preventDefault();
+    const email = document.getElementById('lb-email-input').value.trim();
+    if (!email) return;
+    localStorage.setItem(LB_EMAIL_KEY, email);
+    lbAddEntry(email, score, teams, fanStart);
+    renderLeaderboard(email);
+  };
+}
+
+function initStickyBar() {
+  if (!lastData) return;
+
+  // If user already gave email, show leaderboard inline instead and skip bar
+  const savedEmail = localStorage.getItem(LB_EMAIL_KEY);
+  if (savedEmail) return;
+
+  const entries = lbGetEntries();
+  const bar     = document.getElementById('sticky-rank-bar');
+  const total   = document.getElementById('sticky-total');
+
+  total.textContent = entries.length > 0 ? entries.length.toLocaleString() : '—';
+  bar.style.display = 'block';
+
+  // Close button
+  document.getElementById('sticky-rank-close').onclick = () => {
+    bar.style.display = 'none';
+  };
+
+  // Form submit — reveal rank, hide bar, show leaderboard
+  document.getElementById('sticky-rank-form').onsubmit = function(e) {
+    e.preventDefault();
+    const email    = document.getElementById('sticky-email-input').value.trim();
+    const name     = document.getElementById('sticky-name-input').value.trim();
+    if (!email || !name) return;
+
+    const teams    = (lastData.team_results || []).map(t => t.team_name);
+    const fanStart = document.getElementById('fan-start-year').value;
+    const score    = lastData.total_score || 0;
+
+    localStorage.setItem(LB_EMAIL_KEY, email);
+    localStorage.setItem(LB_NAME_KEY, name);
+    lbAddEntry(email, score, teams, fanStart, name);
+
+    bar.style.display = 'none';
+
+    // Re-render leaderboard with email unlocked and scroll to it
+    const section = document.getElementById('leaderboard-section');
+    section.style.display = 'block';
+    renderLeaderboard(email);
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+}
+
+// ─── UTILS ────────────────────────────────────────────
+function fmt(n) { return Math.round(n).toLocaleString(); }
+
+function scoreColor(ps) {
+  if (ps >= 55)  return '#e03840';
+  if (ps >= 40)  return '#e05020';
+  if (ps >= 25)  return '#e08020';
+  if (ps >= 10)  return '#d4a830';
+  if (ps >= -5)  return '#a09070';
+  return '#4ecb7a';
+}
+
+function barColor(s) {
+  if (s <= -40) return '#4ecb7a';
+  if (s <= 0)   return '#7acb9a';
+  if (s <= 20)  return '#d4a830';
+  if (s <= 40)  return '#e08020';
+  if (s <= 60)  return '#e05020';
+  return '#e03840';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent    = msg;
+  el.style.display  = 'block';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>

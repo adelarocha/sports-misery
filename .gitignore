@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+debug_nfl_api*.py
+patch_nfl_2025.py
+generate_data.py
