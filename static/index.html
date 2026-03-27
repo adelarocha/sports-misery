@@ -984,24 +984,32 @@
     .lb-score { font-weight: 800; font-size: 0.9rem; white-space: nowrap; }
     .lb-row { cursor: pointer; transition: border-color 0.15s; }
     .lb-row:hover { border-color: var(--accent); }
-    /* Leaderboard drill-down panel */
-    #lb-detail {
+    .lb-row.expanded { border-color: var(--accent); border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; }
+    /* Inline drill-down panel */
+    .lb-detail-panel {
       display: none;
-      background: var(--card);
+      background: rgba(224,90,32,0.05);
       border: 1px solid var(--accent);
-      border-radius: var(--radius-sm);
-      padding: 1rem 1.2rem;
-      margin-bottom: 1rem;
+      border-top: none;
+      border-bottom-left-radius: var(--radius-sm);
+      border-bottom-right-radius: var(--radius-sm);
+      padding: 0.75rem 1rem 0.85rem;
+      margin-bottom: 0.35rem;
+      font-size: 0.8rem;
     }
-    #lb-detail h4 { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--accent); }
-    .lb-detail-row {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 0.3rem 0; border-bottom: 1px solid var(--border);
-      font-size: 0.82rem;
+    .lb-detail-panel.open { display: block; }
+    .lb-detail-loading { color: var(--muted); font-style: italic; font-size: 0.78rem; }
+    .lb-detail-team-block { margin-bottom: 0.6rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+    .lb-detail-team-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .lb-detail-team-name { font-weight: 700; color: var(--text); margin-bottom: 0.3rem; font-size: 0.83rem; }
+    .lb-detail-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.3rem 0.5rem;
     }
-    .lb-detail-row:last-child { border-bottom: none; }
-    .lb-detail-team { font-weight: 600; color: var(--text); }
-    .lb-detail-score { font-weight: 700; }
+    .lb-detail-stat { display: flex; flex-direction: column; }
+    .lb-detail-stat-val { font-weight: 700; font-size: 0.82rem; }
+    .lb-detail-stat-lbl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .lb-you-badge {
       font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em;
       text-transform: uppercase; color: var(--accent);
@@ -1433,8 +1441,6 @@
         <!-- Full leaderboard (shown after email) -->
         <div id="lb-full" style="display:none">
           <div class="lb-your-rank" id="lb-your-rank"></div>
-          <!-- Drill-down panel: shows team breakdown for clicked entry -->
-          <div id="lb-detail"></div>
           <div class="lb-list-wrap">
             <div class="lb-list-header">
               <span>#</span><span>Fan</span><span>Teams</span><span>Score</span>
@@ -2044,7 +2050,7 @@ function renderLbRow(entry, rank, isYou) {
   const scoreColor = scoreVal < 0 ? '#4ecb7a' : 'var(--accent)';
   const entryId    = entry.id || '';
   return `
-    <div class="lb-row${isYou ? ' is-you' : ''}" onclick="lbShowDetail(${entryId})" data-id="${entryId}">
+    <div class="lb-row${isYou ? ' is-you' : ''}" onclick="lbToggleDetail(${entryId}, this)" data-id="${entryId}">
       <span class="lb-rank ${rankClass}">${rankLabel}</span>
       <div>
         <div class="lb-name">${lbDisplayName(entry)}${isYou ? ' <span class="lb-you-badge">You</span>' : ''}</div>
@@ -2052,46 +2058,114 @@ function renderLbRow(entry, rank, isYou) {
       </div>
       <span></span>
       <span class="lb-score" style="color:${scoreColor}">${scoreVal.toLocaleString()}</span>
-    </div>`;
+    </div>
+    <div class="lb-detail-panel" id="lb-detail-${entryId}"></div>`;
 }
 
-function lbShowDetail(id) {
-  const entry  = _lbEntries.find(e => e.id === id);
-  const panel  = document.getElementById('lb-detail');
-  if (!entry || !panel) return;
+async function lbToggleDetail(id, rowEl) {
+  const panel = document.getElementById(`lb-detail-${id}`);
+  if (!panel) return;
 
-  // Toggle off if clicking the same entry again
-  if (panel.dataset.openId === String(id) && panel.style.display !== 'none') {
-    panel.style.display = 'none';
-    panel.dataset.openId = '';
+  // Toggle off if already open
+  if (panel.classList.contains('open')) {
+    panel.classList.remove('open');
+    rowEl.classList.remove('expanded');
     return;
   }
-  panel.dataset.openId = String(id);
+
+  // Close any other open panels
+  document.querySelectorAll('.lb-detail-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.lb-row.expanded').forEach(r => r.classList.remove('expanded'));
+
+  panel.classList.add('open');
+  rowEl.classList.add('expanded');
+
+  // If already populated, just show it
+  if (panel.dataset.loaded === 'true') return;
+
+  panel.innerHTML = '<div class="lb-detail-loading">Loading breakdown…</div>';
+
+  const entry = _lbEntries.find(e => e.id === id);
+  if (!entry) { panel.innerHTML = '<div class="lb-detail-loading">Entry not found.</div>'; return; }
 
   const teams    = Array.isArray(entry.teams) ? entry.teams : JSON.parse(entry.teams || '[]');
-  const scoreVal = Math.round(entry.score);
-  const color    = scoreVal < 0 ? '#4ecb7a' : 'var(--accent)';
+  const fanStart = entry.fan_start;
 
-  // Each team entry is stored as "LEAGUE:TEAMID" or just a name string
-  const teamRows = teams.map(t => {
-    const parts = t.includes(':') ? t.split(':') : [null, t];
-    const label = parts[1] || t;
-    return `<div class="lb-detail-row">
-      <span class="lb-detail-team">${label}</span>
-    </div>`;
-  }).join('');
+  // Build /api/calculate payload from stored "LEAGUE:TEAMID" strings
+  const body = { fan_start_year: fanStart };
+  teams.forEach(t => {
+    if (!t.includes(':')) return;
+    const [league, teamId] = t.split(':');
+    body[`${league.toLowerCase()}_team`] = teamId;
+  });
 
-  panel.innerHTML = `
-    <h4>📋 ${lbDisplayName(entry)}'s breakdown · fan since ${entry.fan_start}</h4>
-    <div class="lb-detail-row">
-      <span class="lb-detail-team">Overall SufferScore</span>
-      <span class="lb-detail-score" style="color:${color}">${scoreVal.toLocaleString()}</span>
-    </div>
-    <div style="margin-top:0.5rem; font-size:0.75rem; color:var(--muted); margin-bottom:0.25rem;">Teams followed</div>
-    ${teamRows}
-  `;
-  panel.style.display = 'block';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try {
+    const res  = await fetch('/api/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (data.error || !data.team_results) {
+      panel.innerHTML = '<div class="lb-detail-loading">Could not load breakdown.</div>';
+      return;
+    }
+
+    const overallScore = Math.round(data.total_score);
+    const overallColor = overallScore < 0 ? '#4ecb7a' : 'var(--accent)';
+
+    const teamBlocks = data.team_results.map(t => {
+      const sc      = Math.round(t.total_score || 0);
+      const scColor = sc < 0 ? '#4ecb7a' : 'var(--accent)';
+      const rec     = t.reg_record || {};
+      const recStr  = rec.t ? `${rec.w}-${rec.l}-${rec.t}` : `${rec.w || 0}-${rec.l || 0}`;
+      const titles  = (t.championships || []).length;
+      const playoffSeasons = t.playoff_appearances ?? 0;
+      const totalSeasons   = t.seasons_watched || 1;
+      const playoffRate    = totalSeasons > 0
+        ? Math.round((playoffSeasons / totalSeasons) * 100) + '%'
+        : '—';
+
+      return `
+        <div class="lb-detail-team-block">
+          <div class="lb-detail-team-name">${t.team_name || t.team_id}</div>
+          <div class="lb-detail-stats">
+            <div class="lb-detail-stat">
+              <span class="lb-detail-stat-val" style="color:${scColor}">${sc.toLocaleString()}</span>
+              <span class="lb-detail-stat-lbl">Misery</span>
+            </div>
+            <div class="lb-detail-stat">
+              <span class="lb-detail-stat-val">${recStr}</span>
+              <span class="lb-detail-stat-lbl">Reg Record</span>
+            </div>
+            <div class="lb-detail-stat">
+              <span class="lb-detail-stat-val">${titles}</span>
+              <span class="lb-detail-stat-lbl">Titles</span>
+            </div>
+            <div class="lb-detail-stat">
+              <span class="lb-detail-stat-val">${playoffRate}</span>
+              <span class="lb-detail-stat-lbl">Playoff Rate</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    panel.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+        <span style="font-weight:700; font-size:0.82rem; color:var(--text);">
+          ${lbDisplayName(entry)} · fan since ${fanStart}
+        </span>
+        <span style="font-weight:800; font-size:0.9rem; color:${overallColor};">
+          Total: ${overallScore.toLocaleString()}
+        </span>
+      </div>
+      ${teamBlocks}`;
+    panel.dataset.loaded = 'true';
+
+  } catch (err) {
+    panel.innerHTML = '<div class="lb-detail-loading">Failed to load — try again.</div>';
+  }
 }
 
 async function fetchLeaderboard() {
@@ -2157,7 +2231,7 @@ async function initLeaderboard() {
   const section = document.getElementById('leaderboard-section');
   section.style.display = 'block';
 
-  const teams    = (lastData.team_results || []).map(t => t.team_name);
+  const teams    = (lastData.team_results || []).map(t => `${t.league}:${t.team_id}`);
   const fanStart = parseInt(document.getElementById('fan-start-year').value) || 1990;
   const score    = lastData.total_score || 0;
 
@@ -2231,7 +2305,7 @@ async function initStickyBar() {
     const name  = document.getElementById('sticky-name-input').value.trim();
     if (!email || !name) return;
 
-    const teams    = (lastData.team_results || []).map(t => t.team_name);
+    const teams    = (lastData.team_results || []).map(t => `${t.league}:${t.team_id}`);
     const fanStart = parseInt(document.getElementById('fan-start-year').value) || 1990;
     const score    = lastData.total_score || 0;
 
