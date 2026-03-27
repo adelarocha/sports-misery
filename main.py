@@ -14,6 +14,14 @@ import tornado.web
 from scoring import calculate_team_misery, calculate_overall_misery, misery_label
 from percentile import get_percentile, load_or_build_cache
 
+# DB is optional — only active when DATABASE_URL is set
+DB_ENABLED = bool(os.environ.get("DATABASE_URL", ""))
+if DB_ENABLED:
+    try:
+        import db as _db
+    except ImportError:
+        DB_ENABLED = False
+
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
@@ -193,7 +201,79 @@ class TeamProfileHandler(BaseHandler):
 
 class HealthHandler(BaseHandler):
     def get(self):
-        self.write_json({"status": "ok", "leagues_loaded": list(LEAGUE_DATA.keys())})
+        self.write_json({"status": "ok", "leagues_loaded": list(LEAGUE_DATA.keys()),
+                         "db_enabled": DB_ENABLED})
+
+
+# ---------------------------------------------------------------------------
+# Leaderboard handlers
+# ---------------------------------------------------------------------------
+class LeaderboardHandler(BaseHandler):
+    def get(self):
+        if not DB_ENABLED:
+            return self.write_json({"entries": [], "db_enabled": False})
+        try:
+            entries = _db.get_leaderboard(limit=200)
+            # Serialize datetimes to ISO strings
+            for e in entries:
+                if e.get("created_at"):
+                    e["created_at"] = e["created_at"].isoformat()
+                # Don't expose emails in public list
+                e.pop("email", None)
+            self.write_json({"entries": entries, "db_enabled": True})
+        except Exception as ex:
+            self.write_error_json(500, str(ex))
+
+
+class SubmitHandler(BaseHandler):
+    async def post(self):
+        if not DB_ENABLED:
+            return self.write_json({"ok": False, "reason": "db_not_configured"})
+        try:
+            body = json.loads(self.request.body)
+        except Exception:
+            return self.write_error_json(400, "Invalid JSON body")
+
+        display_name = (body.get("display_name") or "").strip()
+        email = (body.get("email") or "").strip().lower()
+        score = body.get("score")
+        teams = body.get("teams", [])
+        fan_start = body.get("fan_start", 1990)
+
+        if not display_name:
+            return self.write_error_json(400, "display_name is required")
+        if not isinstance(score, (int, float)):
+            return self.write_error_json(400, "score must be a number")
+
+        try:
+            entry = _db.submit_entry(
+                display_name=display_name,
+                email=email or None,
+                score=int(score),
+                teams=teams,
+                fan_start=int(fan_start),
+            )
+            rank_data = _db.get_rank(int(score))
+            self.write_json({
+                "ok": True,
+                "rank": rank_data["rank"],
+                "total": rank_data["total"],
+            })
+        except Exception as ex:
+            self.write_error_json(500, str(ex))
+
+
+class RankHandler(BaseHandler):
+    """GET /api/rank?score=1234 — returns rank without storing anything."""
+    def get(self):
+        if not DB_ENABLED:
+            return self.write_json({"rank": None, "total": 0, "db_enabled": False})
+        try:
+            score = int(self.get_argument("score", "0"))
+            rank_data = _db.get_rank(score)
+            self.write_json(rank_data)
+        except Exception as ex:
+            self.write_error_json(500, str(ex))
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +297,9 @@ def make_app():
         (r"/api/calculate",                         CalculateHandler),
         (r"/api/team/([a-zA-Z]+)/([A-Z0-9]+)",     TeamProfileHandler),
         (r"/api/health",                            HealthHandler),
+        (r"/api/leaderboard",                       LeaderboardHandler),
+        (r"/api/submit",                            SubmitHandler),
+        (r"/api/rank",                              RankHandler),
         (r"/static/(.*)",                           tornado.web.StaticFileHandler,
          {"path": str(STATIC_DIR)}),
     ], debug=False)
@@ -237,6 +320,29 @@ def main():
 
     print("Building percentile reference population (first run may take ~10s)...")
     load_or_build_cache(LEAGUE_DATA)
+
+    if DB_ENABLED:
+        print("Initializing database...")
+        try:
+            _db.init_db()
+            _db.add_unique_email_constraint()
+            if not _db.has_seeded():
+                print("Seeding leaderboard with starter entries...")
+                from seed_db import SEED_ENTRIES
+                for e in SEED_ENTRIES:
+                    _db.submit_entry(
+                        display_name=e["display_name"],
+                        email=None,
+                        score=e["score"],
+                        teams=e["teams"],
+                        fan_start=e["fan_start"],
+                        is_seed=True,
+                    )
+                print(f"  Seeded {len(SEED_ENTRIES)} entries.")
+            else:
+                print("  DB already seeded, skipping.")
+        except Exception as ex:
+            print(f"  DB init failed: {ex}")
 
     app = make_app()
     app.listen(port, address="0.0.0.0")

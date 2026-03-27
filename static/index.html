@@ -1741,8 +1741,8 @@ function render(data) {
   const results = document.getElementById('results');
   results.style.display = 'block';
   setTimeout(() => results.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
-  setTimeout(() => initLeaderboard(), 400);
-  setTimeout(() => initStickyBar(), 1200);
+  setTimeout(async () => { await initLeaderboard(); }, 400);
+  setTimeout(async () => { await initStickyBar(); }, 1200);
 
   const score       = data.total_score;
   const totalSeasons = data.team_results.reduce((a, t) => a + t.seasons_watched, 0);
@@ -1991,134 +1991,151 @@ function reset() {
   document.getElementById('empty-state').style.display         = 'block';
   document.getElementById('team-cards').innerHTML              = '';
   lastData = null;
+  _lbEntries = [];
+  _myRank    = null;
+  _myTotal   = null;
   window.history.replaceState({}, '', window.location.pathname);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ─── LEADERBOARD ──────────────────────────────────────
-const LB_KEY       = 'smcLeaderboard';
+// ─── LEADERBOARD (backend-powered) ────────────────────
 const LB_EMAIL_KEY = 'smcEmail';
 const LB_NAME_KEY  = 'smcName';
-const LB_MAX       = 100;
 
-function lbGetEntries() {
-  try { return JSON.parse(localStorage.getItem(LB_KEY) || '[]'); } catch { return []; }
-}
-
-function lbSaveEntries(arr) {
-  localStorage.setItem(LB_KEY, JSON.stringify(arr));
-}
-
-function lbAddEntry(email, score, teams, fanStart, name) {
-  const entries = lbGetEntries();
-  const idx = entries.findIndex(e => e.email === email);
-  const entry = { email, name: name || email.split('@')[0], score, teams, fanStart, ts: Date.now() };
-  if (idx >= 0) {
-    if (score > entries[idx].score) entries[idx] = entry;
-    else if (name) entries[idx].name = name; // update name even if score isn't higher
-  } else {
-    entries.push(entry);
-  }
-  // Sort descending by score, keep top LB_MAX
-  entries.sort((a, b) => b.score - a.score);
-  lbSaveEntries(entries.slice(0, LB_MAX));
-}
-
-function lbRankOf(email) {
-  const entries = lbGetEntries();
-  const idx = entries.findIndex(e => e.email === email);
-  return idx >= 0 ? idx + 1 : null;
-}
+// In-memory cache of leaderboard entries fetched from server
+let _lbEntries = [];
+let _myRank    = null;
+let _myTotal   = null;
 
 function lbDisplayName(entry) {
-  return entry.name || entry.email.split('@')[0];
+  return entry.display_name || '—';
 }
 
 function renderLbRow(entry, rank, isYou) {
   const rankClass = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
   const medals    = ['🥇','🥈','🥉'];
   const rankLabel = rank <= 3 ? medals[rank-1] : `#${rank}`;
-  const teamStr   = (entry.teams || []).join(', ');
+  const teams     = Array.isArray(entry.teams) ? entry.teams : (JSON.parse(entry.teams || '[]'));
+  const teamStr   = teams.join(', ');
   return `
     <div class="lb-row${isYou ? ' is-you' : ''}">
       <span class="lb-rank ${rankClass}">${rankLabel}</span>
       <div>
         <div class="lb-name">${lbDisplayName(entry)}${isYou ? ' <span class="lb-you-badge">You</span>' : ''}</div>
-        <div class="lb-teams">${teamStr} · since ${entry.fanStart}</div>
+        <div class="lb-teams">${teamStr} · since ${entry.fan_start}</div>
       </div>
       <span></span>
       <span class="lb-score">${Math.round(entry.score).toLocaleString()}</span>
     </div>`;
 }
 
-function renderLeaderboard(email) {
-  const entries = lbGetEntries();
-  const rank    = lbRankOf(email);
+async function fetchLeaderboard() {
+  try {
+    const r = await fetch('/api/leaderboard');
+    const d = await r.json();
+    if (d.entries) _lbEntries = d.entries;
+  } catch (err) {
+    console.warn('Leaderboard fetch failed:', err);
+  }
+}
+
+async function submitToLeaderboard(displayName, email, score, teams, fanStart) {
+  try {
+    const r = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_name: displayName, email, score, teams, fan_start: fanStart }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      _myRank  = d.rank;
+      _myTotal = d.total;
+      // Refresh leaderboard list
+      await fetchLeaderboard();
+    }
+    return d;
+  } catch (err) {
+    console.warn('Submit failed:', err);
+    return { ok: false };
+  }
+}
+
+function renderLeaderboard(myDisplayName) {
+  const entries = _lbEntries;
 
   // Top 3 teaser (always visible)
   const top3 = entries.slice(0, 3);
   document.getElementById('lb-top3').innerHTML =
-    top3.map((e, i) => renderLbRow(e, i + 1, e.email === email)).join('');
+    top3.map((e, i) => renderLbRow(e, i + 1, e.display_name === myDisplayName)).join('');
 
-  if (!email) return; // gate still showing
+  if (!myDisplayName) return; // gate still showing
 
   // Your rank banner
-  document.getElementById('lb-your-rank').innerHTML = rank
-    ? `You rank <strong>#${rank}</strong> out of <strong>${entries.length}</strong> fans on the leaderboard.`
-    : `Your score has been added to the leaderboard.`;
+  if (_myRank) {
+    document.getElementById('lb-your-rank').innerHTML =
+      `You rank <strong>#${_myRank}</strong> out of <strong>${_myTotal}</strong> fans on the leaderboard.`;
+  } else {
+    document.getElementById('lb-your-rank').innerHTML = `Your score has been added to the leaderboard.`;
+  }
 
   // Full list (up to 50)
   document.getElementById('lb-rows').innerHTML =
-    entries.slice(0, 50).map((e, i) => renderLbRow(e, i + 1, e.email === email)).join('');
+    entries.slice(0, 50).map((e, i) => renderLbRow(e, i + 1, e.display_name === myDisplayName)).join('');
 
   document.getElementById('lb-gate').style.display = 'none';
   document.getElementById('lb-full').style.display  = 'block';
 }
 
-function initLeaderboard() {
+async function initLeaderboard() {
   if (!lastData) return;
 
   const section = document.getElementById('leaderboard-section');
   section.style.display = 'block';
 
-  // Build team list for this submission
   const teams    = (lastData.team_results || []).map(t => t.team_name);
-  const fanStart = document.getElementById('fan-start-year').value;
+  const fanStart = parseInt(document.getElementById('fan-start-year').value) || 1990;
   const score    = lastData.total_score || 0;
 
-  // Check if user already gave email
-  const savedEmail = localStorage.getItem(LB_EMAIL_KEY);
+  // Fetch fresh leaderboard from server
+  await fetchLeaderboard();
+
+  // Check if user already gave their info in this browser session
   const savedName  = localStorage.getItem(LB_NAME_KEY);
-  if (savedEmail) {
-    lbAddEntry(savedEmail, score, teams, fanStart, savedName);
-    renderLeaderboard(savedEmail);
-  } else {
-    renderLeaderboard(null);
+  const savedEmail = localStorage.getItem(LB_EMAIL_KEY);
+  if (savedName && savedEmail) {
+    await submitToLeaderboard(savedName, savedEmail, score, teams, fanStart);
+    renderLeaderboard(savedName);
+    return;
   }
 
-  // Email form submit
-  document.getElementById('lb-email-form').onsubmit = function(e) {
+  renderLeaderboard(null);
+
+  // Email form submit (gate inside leaderboard section)
+  document.getElementById('lb-email-form').onsubmit = async function(e) {
     e.preventDefault();
     const email = document.getElementById('lb-email-input').value.trim();
     if (!email) return;
+    const name = email.split('@')[0];
     localStorage.setItem(LB_EMAIL_KEY, email);
-    lbAddEntry(email, score, teams, fanStart);
-    renderLeaderboard(email);
+    localStorage.setItem(LB_NAME_KEY, name);
+    await submitToLeaderboard(name, email, score, teams, fanStart);
+    renderLeaderboard(name);
   };
 }
 
-function initStickyBar() {
+async function initStickyBar() {
   if (!lastData) return;
 
-  // If user already gave email, show leaderboard inline instead and skip bar
+  // If user already submitted in this browser, skip bar
   const savedEmail = localStorage.getItem(LB_EMAIL_KEY);
   if (savedEmail) return;
 
-  const entries = lbGetEntries();
-  const bar     = document.getElementById('sticky-rank-bar');
-  const total   = document.getElementById('sticky-total');
+  // Fetch server leaderboard to get total count
+  if (_lbEntries.length === 0) await fetchLeaderboard();
 
-  total.textContent = entries.length > 0 ? entries.length.toLocaleString() : '—';
+  const bar   = document.getElementById('sticky-rank-bar');
+  const total = document.getElementById('sticky-total');
+  total.textContent = _lbEntries.length > 0 ? _lbEntries.length.toLocaleString() : '—';
   bar.style.display = 'block';
 
   // Close button
@@ -2126,27 +2143,30 @@ function initStickyBar() {
     bar.style.display = 'none';
   };
 
-  // Form submit — reveal rank, hide bar, show leaderboard
-  document.getElementById('sticky-rank-form').onsubmit = function(e) {
+  // Form submit — POST to backend, reveal rank, hide bar, show leaderboard
+  document.getElementById('sticky-rank-form').onsubmit = async function(e) {
     e.preventDefault();
-    const email    = document.getElementById('sticky-email-input').value.trim();
-    const name     = document.getElementById('sticky-name-input').value.trim();
+    const email = document.getElementById('sticky-email-input').value.trim();
+    const name  = document.getElementById('sticky-name-input').value.trim();
     if (!email || !name) return;
 
     const teams    = (lastData.team_results || []).map(t => t.team_name);
-    const fanStart = document.getElementById('fan-start-year').value;
+    const fanStart = parseInt(document.getElementById('fan-start-year').value) || 1990;
     const score    = lastData.total_score || 0;
 
     localStorage.setItem(LB_EMAIL_KEY, email);
     localStorage.setItem(LB_NAME_KEY, name);
-    lbAddEntry(email, score, teams, fanStart, name);
+
+    const btn = this.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    await submitToLeaderboard(name, email, score, teams, fanStart);
 
     bar.style.display = 'none';
 
-    // Re-render leaderboard with email unlocked and scroll to it
     const section = document.getElementById('leaderboard-section');
     section.style.display = 'block';
-    renderLeaderboard(email);
+    renderLeaderboard(name);
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 }
