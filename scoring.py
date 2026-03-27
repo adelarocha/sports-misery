@@ -492,12 +492,16 @@ def calculate_overall_misery(team_results: list) -> dict:
 # ---------------------------------------------------------------------------
 # Misery label
 # ---------------------------------------------------------------------------
-def misery_label(score: float, num_teams: int, total_seasons: int) -> dict:
+def misery_label(score: float, num_teams: int, total_seasons: int,
+                 recent_titles: int = 0) -> dict:
     """
     Human-readable label based on score per team per season.
-    Normalizes for BOTH number of teams followed AND seasons watched,
-    so a 40-year 4-team fan doesn't automatically land in the top tier.
-    This keeps the distribution bell-shaped across typical fan profiles.
+    Normalizes for BOTH number of teams followed AND seasons watched.
+
+    recent_titles: number of championships won by any followed team
+    in the last 15 years. A fan with any recent title is capped at
+    Chronic Heartbreak — they can't claim Legendary Suffering while
+    still celebrating a ring.
     """
     teams      = max(num_teams, 1)
     seasons    = max(total_seasons / teams, 1)   # avg seasons per team
@@ -517,5 +521,9 @@ def misery_label(score: float, num_teams: int, total_seasons: int) -> dict:
         label, emoji = "Insufferable Winner",                    "🏆"
     else:
         label, emoji = "Dynasty Fan. We Don't Want to Hear It.", "👑"
+
+    # Hard cap: any title in the last 15 years disqualifies Legendary Suffering
+    if label == "Legendary Suffering" and recent_titles > 0:
+        label, emoji = "Chronic Heartbreak", "😭"
 
     return {"label": label, "emoji": emoji, "per_season_avg": round(per_season, 2)}

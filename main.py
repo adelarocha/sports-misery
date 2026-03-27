@@ -173,7 +173,14 @@ class CalculateHandler(BaseHandler):
 
         # Misery label
         total_seasons = sum(t.get("seasons_watched", 1) for t in team_results)
-        label_data = misery_label(total_score, num_teams, total_seasons)
+        # Count titles any followed team won in the last 15 years
+        current_year = 2025
+        recent_titles = sum(
+            1 for t in team_results
+            for yr in t.get("championships", [])
+            if current_year - yr <= 15
+        )
+        label_data = misery_label(total_score, num_teams, total_seasons, recent_titles)
 
         # Percentile
         percentile_data = get_percentile(total_score, LEAGUE_DATA, fan_start, num_teams)
