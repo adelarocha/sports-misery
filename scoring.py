@@ -55,9 +55,10 @@ def championship_joy(champ_index: int) -> float:
     """
     Joy score for the Nth championship in a dynasty (within 15-year window).
     champ_index: 0 = first title, 1 = second title in window, etc.
-    Compounds: -200, -260, -330, -415...  (~30% per additional title)
+    Compounds: -350, -455, -590, -770...  (~30% per additional title)
+    Increased from -200 base to better push dynasty fans into negative territory.
     """
-    return -200.0 * (1.30 ** champ_index)
+    return -350.0 * (1.30 ** champ_index)
 
 
 def get_dynasty_index(year: int, prior_champs_in_window: list) -> int:
@@ -128,9 +129,10 @@ def championship_joy_offset(years_since_last_champ: int) -> float:
     Additive reduction for the seasons immediately after a championship.
     Captures 'house money' feeling. Applied before drought multiplier.
     """
-    if years_since_last_champ == 1:   return -25.0
-    elif years_since_last_champ == 2: return -12.0
-    elif years_since_last_champ == 3: return -6.0
+    if years_since_last_champ == 1:   return -40.0
+    elif years_since_last_champ == 2: return -20.0
+    elif years_since_last_champ == 3: return -10.0
+    elif years_since_last_champ == 4: return -5.0
     else:                             return 0.0
 
 
@@ -492,27 +494,28 @@ def calculate_overall_misery(team_results: list) -> dict:
 # ---------------------------------------------------------------------------
 def misery_label(score: float, num_teams: int, total_seasons: int) -> dict:
     """
-    Human-readable label based on score per team.
-    Normalizes for number of teams followed (a 4-team fan shouldn't get
-    4x the label just for following more teams), but NOT for years watched
-    (a 40-year fan has genuinely suffered more than a 20-year fan).
+    Human-readable label based on score per team per season.
+    Normalizes for BOTH number of teams followed AND seasons watched,
+    so a 40-year 4-team fan doesn't automatically land in the top tier.
+    This keeps the distribution bell-shaped across typical fan profiles.
     """
     teams      = max(num_teams, 1)
-    per_season = score / teams
+    seasons    = max(total_seasons / teams, 1)   # avg seasons per team
+    per_season = score / teams / seasons
 
-    if per_season >= 45:
+    if per_season >= 8:
         label, emoji = "Legendary Suffering",                    "💀"
-    elif per_season >= 30:
+    elif per_season >= 4:
         label, emoji = "Chronic Heartbreak",                     "😭"
-    elif per_season >= 15:
+    elif per_season >= 1.5:
         label, emoji = "Perpetual Disappointment",               "😤"
-    elif per_season >= 5:
+    elif per_season >= 0:
         label, emoji = "Occasional Sadness",                     "😔"
-    elif per_season >= -10:
+    elif per_season >= -2:
         label, emoji = "Pretty Lucky, Actually",                 "🙂"
-    elif per_season >= -30:
+    elif per_season >= -5:
         label, emoji = "Insufferable Winner",                    "🏆"
     else:
         label, emoji = "Dynasty Fan. We Don't Want to Hear It.", "👑"
 
-    return {"label": label, "emoji": emoji, "per_season_avg": round(per_season, 1)}
+    return {"label": label, "emoji": emoji, "per_season_avg": round(per_season, 2)}

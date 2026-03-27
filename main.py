@@ -326,21 +326,22 @@ def main():
         try:
             _db.init_db()
             _db.add_unique_email_constraint()
-            if not _db.has_seeded():
-                print("Seeding leaderboard with starter entries...")
-                from seed_db import SEED_ENTRIES
-                for e in SEED_ENTRIES:
-                    _db.submit_entry(
-                        display_name=e["display_name"],
-                        email=None,
-                        score=e["score"],
-                        teams=e["teams"],
-                        fan_start=e["fan_start"],
-                        is_seed=True,
-                    )
-                print(f"  Seeded {len(SEED_ENTRIES)} entries.")
-            else:
-                print("  DB already seeded, skipping.")
+            from seed_db import SEED_ENTRIES
+            # Always refresh seed entries so score changes propagate on redeploy
+            deleted = _db.clear_seed_entries()
+            if deleted:
+                print(f"  Cleared {deleted} old seed entries.")
+            print(f"  Seeding {len(SEED_ENTRIES)} entries...")
+            for e in SEED_ENTRIES:
+                _db.submit_entry(
+                    display_name=e["display_name"],
+                    email=None,
+                    score=e["score"],
+                    teams=e["teams"],
+                    fan_start=e["fan_start"],
+                    is_seed=True,
+                )
+            print(f"  Seeded {len(SEED_ENTRIES)} entries.")
         except Exception as ex:
             print(f"  DB init failed: {ex}")
 

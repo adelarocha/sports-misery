@@ -119,6 +119,13 @@ def has_seeded() -> bool:
         return cur.fetchone()["n"] > 0
 
 
+def clear_seed_entries() -> int:
+    """Delete all seed entries. Returns number of rows deleted."""
+    with cursor() as cur:
+        cur.execute("DELETE FROM leaderboard WHERE is_seed = TRUE;")
+        return cur.rowcount
+
+
 def add_unique_email_constraint():
     """Attempt to add unique constraint on email for non-null values. Safe to call multiple times."""
     with cursor() as cur:

@@ -2151,14 +2151,20 @@ async function lbToggleDetail(id, rowEl) {
         </div>`;
     }).join('');
 
+    const tierLabel = data.label  || '';
+    const tierEmoji = data.emoji  || '';
+
     panel.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
         <span style="font-weight:700; font-size:0.82rem; color:var(--text);">
           ${lbDisplayName(entry)} · fan since ${fanStart}
         </span>
         <span style="font-weight:800; font-size:0.9rem; color:${overallColor};">
-          Total: ${overallScore.toLocaleString()}
+          ${overallScore.toLocaleString()}
         </span>
+      </div>
+      <div style="margin-bottom:0.65rem; font-size:0.78rem; color:${overallColor}; font-weight:600;">
+        ${tierEmoji} ${tierLabel}
       </div>
       ${teamBlocks}`;
     panel.dataset.loaded = 'true';
