@@ -981,7 +981,27 @@
     .lb-rank.top3 { color: #cd7f32; }
     .lb-name { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .lb-teams { font-size: 0.72rem; color: var(--muted); }
-    .lb-score { font-weight: 800; color: var(--accent); font-size: 0.9rem; white-space: nowrap; }
+    .lb-score { font-weight: 800; font-size: 0.9rem; white-space: nowrap; }
+    .lb-row { cursor: pointer; transition: border-color 0.15s; }
+    .lb-row:hover { border-color: var(--accent); }
+    /* Leaderboard drill-down panel */
+    #lb-detail {
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.2rem;
+      margin-bottom: 1rem;
+    }
+    #lb-detail h4 { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--accent); }
+    .lb-detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.3rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .lb-detail-row:last-child { border-bottom: none; }
+    .lb-detail-team { font-weight: 600; color: var(--text); }
+    .lb-detail-score { font-weight: 700; }
     .lb-you-badge {
       font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em;
       text-transform: uppercase; color: var(--accent);
@@ -1402,6 +1422,7 @@
             <div class="lb-gate-heading">See where you rank</div>
             <p class="lb-gate-sub">Enter your email to unlock the full leaderboard and get notified when you move up the ranks.</p>
             <form id="lb-email-form" autocomplete="off">
+              <input type="text"  id="lb-name-input"  placeholder="Display name (e.g. EaglesFan)" required style="margin-bottom:0.5rem" />
               <input type="email" id="lb-email-input" placeholder="your@email.com" required />
               <button type="submit" class="lb-submit-btn">Unlock Leaderboard</button>
             </form>
@@ -1412,6 +1433,8 @@
         <!-- Full leaderboard (shown after email) -->
         <div id="lb-full" style="display:none">
           <div class="lb-your-rank" id="lb-your-rank"></div>
+          <!-- Drill-down panel: shows team breakdown for clicked entry -->
+          <div id="lb-detail"></div>
           <div class="lb-list-wrap">
             <div class="lb-list-header">
               <span>#</span><span>Fan</span><span>Teams</span><span>Score</span>
@@ -2012,21 +2035,63 @@ function lbDisplayName(entry) {
 }
 
 function renderLbRow(entry, rank, isYou) {
-  const rankClass = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
-  const medals    = ['🥇','🥈','🥉'];
-  const rankLabel = rank <= 3 ? medals[rank-1] : `#${rank}`;
-  const teams     = Array.isArray(entry.teams) ? entry.teams : (JSON.parse(entry.teams || '[]'));
-  const teamStr   = teams.join(', ');
+  const rankClass  = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+  const medals     = ['🥇','🥈','🥉'];
+  const rankLabel  = rank <= 3 ? medals[rank-1] : `#${rank}`;
+  const teams      = Array.isArray(entry.teams) ? entry.teams : (JSON.parse(entry.teams || '[]'));
+  const teamStr    = teams.join(', ');
+  const scoreVal   = Math.round(entry.score);
+  const scoreColor = scoreVal < 0 ? '#4ecb7a' : 'var(--accent)';
+  const entryId    = entry.id || '';
   return `
-    <div class="lb-row${isYou ? ' is-you' : ''}">
+    <div class="lb-row${isYou ? ' is-you' : ''}" onclick="lbShowDetail(${entryId})" data-id="${entryId}">
       <span class="lb-rank ${rankClass}">${rankLabel}</span>
       <div>
         <div class="lb-name">${lbDisplayName(entry)}${isYou ? ' <span class="lb-you-badge">You</span>' : ''}</div>
         <div class="lb-teams">${teamStr} · since ${entry.fan_start}</div>
       </div>
       <span></span>
-      <span class="lb-score">${Math.round(entry.score).toLocaleString()}</span>
+      <span class="lb-score" style="color:${scoreColor}">${scoreVal.toLocaleString()}</span>
     </div>`;
+}
+
+function lbShowDetail(id) {
+  const entry  = _lbEntries.find(e => e.id === id);
+  const panel  = document.getElementById('lb-detail');
+  if (!entry || !panel) return;
+
+  // Toggle off if clicking the same entry again
+  if (panel.dataset.openId === String(id) && panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    panel.dataset.openId = '';
+    return;
+  }
+  panel.dataset.openId = String(id);
+
+  const teams    = Array.isArray(entry.teams) ? entry.teams : JSON.parse(entry.teams || '[]');
+  const scoreVal = Math.round(entry.score);
+  const color    = scoreVal < 0 ? '#4ecb7a' : 'var(--accent)';
+
+  // Each team entry is stored as "LEAGUE:TEAMID" or just a name string
+  const teamRows = teams.map(t => {
+    const parts = t.includes(':') ? t.split(':') : [null, t];
+    const label = parts[1] || t;
+    return `<div class="lb-detail-row">
+      <span class="lb-detail-team">${label}</span>
+    </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <h4>📋 ${lbDisplayName(entry)}'s breakdown · fan since ${entry.fan_start}</h4>
+    <div class="lb-detail-row">
+      <span class="lb-detail-team">Overall SufferScore</span>
+      <span class="lb-detail-score" style="color:${color}">${scoreVal.toLocaleString()}</span>
+    </div>
+    <div style="margin-top:0.5rem; font-size:0.75rem; color:var(--muted); margin-bottom:0.25rem;">Teams followed</div>
+    ${teamRows}
+  `;
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function fetchLeaderboard() {
@@ -2108,14 +2173,22 @@ async function initLeaderboard() {
     return;
   }
 
+  // Set smart placeholder on name field based on team count
+  const namePlaceholder = teams.length === 1
+    ? `e.g. ${teams[0].split(':')[1] || teams[0]}Fan`
+    : 'e.g. NYSportsFan';
+  const nameInput = document.getElementById('lb-name-input');
+  if (nameInput) nameInput.placeholder = namePlaceholder;
+
   renderLeaderboard(null);
 
   // Email form submit (gate inside leaderboard section)
   document.getElementById('lb-email-form').onsubmit = async function(e) {
     e.preventDefault();
     const email = document.getElementById('lb-email-input').value.trim();
-    if (!email) return;
-    const name = email.split('@')[0];
+    const name  = (document.getElementById('lb-name-input')?.value || '').trim()
+                  || email.split('@')[0];
+    if (!email || !name) return;
     localStorage.setItem(LB_EMAIL_KEY, email);
     localStorage.setItem(LB_NAME_KEY, name);
     await submitToLeaderboard(name, email, score, teams, fanStart);
@@ -2137,6 +2210,14 @@ async function initStickyBar() {
   const total = document.getElementById('sticky-total');
   total.textContent = _lbEntries.length > 0 ? _lbEntries.length.toLocaleString() : '—';
   bar.style.display = 'block';
+
+  // Smart placeholder based on team count
+  const stickyTeams = (lastData.team_results || []).map(t => t.team_name || '');
+  const stickyPlaceholder = stickyTeams.length === 1
+    ? `e.g. ${stickyTeams[0].replace(/\s+/g, '')}Fan`
+    : 'e.g. NYSportsFan';
+  const stickyNameInput = document.getElementById('sticky-name-input');
+  if (stickyNameInput) stickyNameInput.placeholder = stickyPlaceholder;
 
   // Close button
   document.getElementById('sticky-rank-close').onclick = () => {
