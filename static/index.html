@@ -1047,14 +1047,14 @@
       display: flex; gap: 0.5rem; justify-content: center;
       flex-wrap: wrap; margin-bottom: 0.6rem;
     }
-    #lb-email-input {
+    #lb-email-input, #lb-name-input {
       background: var(--surface); border: 1px solid var(--border2);
       border-radius: var(--radius-sm); color: var(--text);
       padding: 0.55rem 0.9rem; font-size: 0.85rem;
       flex: 1; min-width: 200px; max-width: 280px;
-      outline: none;
+      outline: none; margin-bottom: 0;
     }
-    #lb-email-input:focus { border-color: var(--accent); }
+    #lb-email-input:focus, #lb-name-input:focus { border-color: var(--accent); }
     .lb-submit-btn {
       background: var(--accent); color: #fff; border: none;
       border-radius: var(--radius-sm); padding: 0.55rem 1.2rem;
@@ -1430,8 +1430,8 @@
             <div class="lb-gate-heading">See where you rank</div>
             <p class="lb-gate-sub">Enter your email to unlock the full leaderboard and get notified when you move up the ranks.</p>
             <form id="lb-email-form" autocomplete="off">
-              <input type="text"  id="lb-name-input"  placeholder="Display name (e.g. EaglesFan)" required style="margin-bottom:0.5rem" />
-              <input type="email" id="lb-email-input" placeholder="your@email.com" required />
+              <input type="text"  id="lb-name-input"  placeholder="Username" required />
+              <input type="email" id="lb-email-input" placeholder="Email" required />
               <button type="submit" class="lb-submit-btn">Unlock Leaderboard</button>
             </form>
             <p class="lb-gate-fine">No spam. We'll only email you about leaderboard changes.</p>
@@ -1463,8 +1463,8 @@
       📊 You rank <span class="sticky-rank-mystery">??</span> out of <span id="sticky-total">—</span> fans &mdash; enter your email to reveal your rank.
     </div>
     <form class="sticky-rank-form" id="sticky-rank-form" autocomplete="off">
-      <input type="text"  class="sticky-rank-input" id="sticky-name-input"  placeholder="Display name (e.g. BrownsFan87)" required />
-      <input type="email" class="sticky-rank-input" id="sticky-email-input" placeholder="your@email.com" required />
+      <input type="text"  class="sticky-rank-input" id="sticky-name-input"  placeholder="Username" required />
+      <input type="email" class="sticky-rank-input" id="sticky-email-input" placeholder="Email" required />
       <button type="submit" class="sticky-rank-btn">Reveal My Rank</button>
     </form>
     <button class="sticky-rank-close" id="sticky-rank-close" title="Dismiss">✕</button>
@@ -2253,12 +2253,8 @@ async function initLeaderboard() {
     return;
   }
 
-  // Set smart placeholder on name field based on team count
-  const namePlaceholder = teams.length === 1
-    ? `e.g. ${teams[0].split(':')[1] || teams[0]}Fan`
-    : 'e.g. NYSportsFan';
   const nameInput = document.getElementById('lb-name-input');
-  if (nameInput) nameInput.placeholder = namePlaceholder;
+  if (nameInput) nameInput.placeholder = 'Username';
 
   renderLeaderboard(null);
 
@@ -2291,13 +2287,8 @@ async function initStickyBar() {
   total.textContent = _lbEntries.length > 0 ? _lbEntries.length.toLocaleString() : '—';
   bar.style.display = 'block';
 
-  // Smart placeholder based on team count
-  const stickyTeams = (lastData.team_results || []).map(t => t.team_name || '');
-  const stickyPlaceholder = stickyTeams.length === 1
-    ? `e.g. ${stickyTeams[0].replace(/\s+/g, '')}Fan`
-    : 'e.g. NYSportsFan';
   const stickyNameInput = document.getElementById('sticky-name-input');
-  if (stickyNameInput) stickyNameInput.placeholder = stickyPlaceholder;
+  if (stickyNameInput) stickyNameInput.placeholder = 'Username';
 
   // Close button
   document.getElementById('sticky-rank-close').onclick = () => {
