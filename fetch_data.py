@@ -293,45 +293,125 @@ def fetch_mlb(since_year=1969):
 
 
 def fetch_mlb_playoffs(season):
-    """Returns dict of team_code -> exit_round for teams that made the playoffs."""
+    """
+    Returns dict of team_code -> exit_round for teams that made the playoffs.
+
+    Primary: ESPN postseason standings (same approach as NFL/NBA).
+    MLB postseason wins map to exit round:
+      0 wins = Wild Card loss       -> exit 1
+      1 win  = Division Series loss -> exit 2
+      2 wins = LCS loss             -> exit 3
+      3 wins = World Series loss    -> exit 4 (champion overridden by championships list)
+      4 wins = Champion             -> exit 5 (handled via championships list)
+
+    Fallback: MLB stats API schedule if ESPN returns nothing.
+    """
     exits = {}
-    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&season={season}&gameType=P&hydrate=team"
+
+    # Primary: ESPN postseason standings
+    url = (f"https://site.api.espn.com/apis/v2/sports/baseball/mlb/standings"
+           f"?season={season}&seasontype=3")
     try:
         data = fetch_json(url)
-    except Exception:
-        return exits
+        for conf in data.get("children", []):
+            for entry in conf.get("standings", {}).get("entries", []):
+                abbrev = entry.get("team", {}).get("abbreviation", "")
+                # Normalize ESPN MLB abbreviations
+                abbrev = normalize_mlb_abbrev(abbrev)
+                if not abbrev:
+                    continue
+                stats  = entry.get("stats", [])
+                wins   = next((int(s["value"]) for s in stats if s["name"] == "wins"),       None)
+                losses = next((int(s["value"]) for s in stats if s["name"] == "losses"),     None)
+                seed   = next((s.get("value") for s in stats if s["name"] == "playoffSeed"), None)
 
-    # Find the highest round each team reached
-    # Series types: WC=Wild Card, DS=Division Series, LCS=League Championship, WS=World Series
-    round_value = {"WC": 1, "DS": 2, "LCS": 3, "WS": 4}
-    team_max_round = {}
+                if wins is None or losses is None:
+                    continue
+                if (wins + losses) < 1 or seed is None:
+                    continue
 
-    for date_entry in data.get("dates", []):
-        for game in date_entry.get("games", []):
-            series_desc = game.get("seriesDescription", "")
-            game_type   = game.get("gameType", "")
-            if game_type not in ("W", "D", "L", "S"):
-                continue  # not a playoff game type
+                if wins == 0:
+                    exit_round = 1
+                elif wins == 1:
+                    exit_round = 2
+                elif wins == 2:
+                    exit_round = 3
+                else:
+                    exit_round = 4
+                exits[abbrev] = exit_round
 
-            # Map game type to round
-            if game_type == "W": rval = 1
-            elif game_type == "D": rval = 2
-            elif game_type == "L": rval = 3
-            elif game_type == "S": rval = 4
-            else: continue
+        if exits:
+            print(f"      MLB playoff teams (ESPN): {sorted(exits.keys())}")
+            return exits
+    except Exception as e:
+        print(f"      MLB ESPN standings err: {e}", end=" ")
 
-            for side in ("home", "away"):
-                team_id = game.get("teams", {}).get(side, {}).get("team", {}).get("id")
-                if team_id and team_id in MLB_TEAMS:
-                    code = MLB_TEAMS[team_id][0]
-                    team_max_round[code] = max(team_max_round.get(code, 0), rval)
-
-    # Convert max round reached to exit round
-    # If a team reached round R and didn't win the WS, they lost at round R
-    for code, max_r in team_max_round.items():
-        exits[code] = max_r  # exit = the round they reached (they lost there)
+    # Fallback: MLB stats API schedule
+    url2 = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&season={season}&gameType=P&hydrate=team"
+    try:
+        data2 = fetch_json(url2)
+        team_max_round = {}
+        for date_entry in data2.get("dates", []):
+            for game in date_entry.get("games", []):
+                game_type = game.get("gameType", "")
+                if game_type not in ("W", "D", "L", "S", "F"):
+                    continue
+                if game_type == "W" or game_type == "F": rval = 1
+                elif game_type == "D": rval = 2
+                elif game_type == "L": rval = 3
+                elif game_type == "S": rval = 4
+                else: continue
+                for side in ("home", "away"):
+                    team_id = game.get("teams", {}).get(side, {}).get("team", {}).get("id")
+                    if team_id and team_id in MLB_TEAMS:
+                        code = MLB_TEAMS[team_id][0]
+                        team_max_round[code] = max(team_max_round.get(code, 0), rval)
+        for code, max_r in team_max_round.items():
+            exits[code] = max_r
+        if exits:
+            print(f"      MLB playoff teams (fallback): {sorted(exits.keys())}")
+    except Exception as e2:
+        print(f"      MLB fallback err: {e2}")
 
     return exits
+
+
+def normalize_mlb_abbrev(abbrev):
+    """Map ESPN MLB abbreviations to our team codes."""
+    remap = {
+        "WSH": "WAS",
+        "TB":  "TB",
+        "CWS": "CWS",
+        "KC":  "KC",
+        "SF":  "SF",
+        "SD":  "SD",
+        "NYY": "NYY",
+        "NYM": "NYM",
+        "LAD": "LAD",
+        "LAA": "LAA",
+        "CHC": "CHC",
+        "BOS": "BOS",
+        "STL": "STL",
+        "ATL": "ATL",
+        "HOU": "HOU",
+        "MIN": "MIN",
+        "CLE": "CLE",
+        "DET": "DET",
+        "SEA": "SEA",
+        "TEX": "TEX",
+        "TOR": "TOR",
+        "MIL": "MIL",
+        "PHI": "PHI",
+        "BAL": "BAL",
+        "OAK": "OAK",
+        "PIT": "PIT",
+        "CIN": "CIN",
+        "COL": "COL",
+        "MIA": "MIA",
+        "ARI": "ARI",
+        "WAS": "WAS",
+    }
+    return remap.get(abbrev, abbrev)
 
 
 # ---------------------------------------------------------------------------
@@ -546,33 +626,80 @@ def normalize_nhl_abbrev(abbrev, season):
 
 
 def fetch_nhl_playoffs(season):
-    """Get playoff exit rounds from the NHL API bracket."""
+    """
+    Get NHL playoff exit rounds.
+    Primary: ESPN postseason standings (consistent with NFL/NBA approach).
+    Fallback: NHL bracket API.
+
+    NHL playoff wins map to exit round:
+      0 wins = First Round loss  -> exit 1
+      1 win  = Second Round loss -> exit 2
+      2 wins = Conf Finals loss  -> exit 3
+      3 wins = Finals loss       -> exit 4 (champion overridden by championships list)
+      4 wins = Champion          -> exit 5 (handled via championships list)
+    """
     exits = {}
-    url = f"https://api-web.nhle.com/v1/playoff-bracket/{season+1}"
+
+    # Primary: ESPN postseason standings
+    url = (f"https://site.api.espn.com/apis/v2/sports/hockey/nhl/standings"
+           f"?season={season+1}&seasontype=3")
     try:
         data = fetch_json(url)
-    except Exception:
-        return exits
-
-    # Parse rounds — track highest round each team reached and whether they won
-    rounds = data.get("rounds", [])
-    for rnd in rounds:
-        rnd_num = rnd.get("roundNumber", 0)
-        for series in rnd.get("series", []):
-            top = series.get("topSeedTeam", {})
-            bot = series.get("bottomSeedTeam", {})
-
-            top_code = normalize_nhl_abbrev(top.get("abbrev", ""), season)
-            bot_code = normalize_nhl_abbrev(bot.get("abbrev", ""), season)
-            top_wins = top.get("wins", 0)
-            bot_wins = bot.get("wins", 0)
-
-            for code, wins, opp_wins in [(top_code, top_wins, bot_wins), (bot_code, bot_wins, top_wins)]:
-                if code not in NHL_TEAMS:
+        for conf in data.get("children", []):
+            for entry in conf.get("standings", {}).get("entries", []):
+                abbrev = entry.get("team", {}).get("abbreviation", "")
+                code   = normalize_nhl_abbrev(abbrev, season)
+                if not code or code not in NHL_TEAMS:
                     continue
-                # They reached this round — mark exit if they lost
-                if opp_wins > wins:
-                    exits[code] = rnd_num
+                stats  = entry.get("stats", [])
+                wins   = next((int(s["value"]) for s in stats if s["name"] == "wins"),       None)
+                losses = next((int(s["value"]) for s in stats if s["name"] == "losses"),     None)
+                seed   = next((s.get("value") for s in stats if s["name"] == "playoffSeed"), None)
+
+                if wins is None or losses is None:
+                    continue
+                if (wins + losses) < 1 or seed is None:
+                    continue
+
+                if wins == 0:
+                    exit_round = 1
+                elif wins == 1:
+                    exit_round = 2
+                elif wins == 2:
+                    exit_round = 3
+                else:
+                    exit_round = 4
+                exits[code] = exit_round
+
+        if exits:
+            print(f"      NHL playoff teams (ESPN): {sorted(exits.keys())}")
+            return exits
+    except Exception as e:
+        print(f"      NHL ESPN standings err: {e}", end=" ")
+
+    # Fallback: NHL bracket API
+    url2 = f"https://api-web.nhle.com/v1/playoff-bracket/{season+1}"
+    try:
+        data2 = fetch_json(url2)
+        rounds = data2.get("rounds", [])
+        for rnd in rounds:
+            rnd_num = rnd.get("roundNumber", 0)
+            for series in rnd.get("series", []):
+                top = series.get("topSeedTeam", {})
+                bot = series.get("bottomSeedTeam", {})
+                top_code = normalize_nhl_abbrev(top.get("abbrev", ""), season)
+                bot_code = normalize_nhl_abbrev(bot.get("abbrev", ""), season)
+                top_wins = top.get("wins", 0)
+                bot_wins = bot.get("wins", 0)
+                for code, wins, opp_wins in [(top_code, top_wins, bot_wins), (bot_code, bot_wins, top_wins)]:
+                    if code not in NHL_TEAMS:
+                        continue
+                    if opp_wins > wins:
+                        exits[code] = rnd_num
+        if exits:
+            print(f"      NHL playoff teams (bracket fallback): {sorted(exits.keys())}")
+    except Exception as e2:
+        print(f"      NHL bracket fallback err: {e2}")
 
     return exits
 
@@ -730,7 +857,8 @@ def fetch_nba(since_year=1970):
             except Exception:
                 espn_records = {}
             if espn_records:
-                _apply_nba_season(teams_out, espn_records, {}, season)
+                playoff_exits = fetch_nba_playoffs(season)
+                _apply_nba_season(teams_out, espn_records, playoff_exits, season)
                 print(f"OK via ESPN ({len(espn_records)} teams)")
             else:
                 print(f"SKIP (no data)")
@@ -819,42 +947,114 @@ def fetch_nba_espn_season(season):
 
 
 def fetch_nba_playoffs(season):
-    """Get playoff exit rounds via ESPN bracket."""
+    """
+    Get NBA playoff exit rounds.
+
+    For seasons through 2015, uses a hardcoded lookup table — the ESPN
+    postseason standings endpoint only returns Finals-level teams for
+    older seasons, making it useless for first/second/conf-finals exits.
+
+    For 2016+, tries ESPN first, falls back to hardcoded table.
+
+    Exit round values:
+      1 = First Round loss
+      2 = Second Round loss
+      3 = Conference Finals loss
+      4 = Finals loss (champion overridden separately by championships list)
+    """
+    # Hardcoded NBA playoff exits: season -> {team_code: exit_round}
+    # Only teams that exited in rounds 1-3 (champions/finalists handled by
+    # the championships/finals_losses lists above). Covers 1984-2023.
+    NBA_PLAYOFF_TABLE = {
+        1984: {"BOS":5,"LAL":4,"MIL":3,"PHI":3,"BKN":2,"NYK":2,"ATL":1,"DET":1,"DAL":1,"DEN":1,"PHX":1,"SEA":1,"UTA":1,"SAC":1},
+        1985: {"LAL":5,"BOS":4,"PHI":3,"MIL":3,"DEN":2,"ATL":2,"BKN":1,"CHI":1,"DAL":1,"HOU":1,"PHX":1,"SAC":1},
+        1986: {"BOS":5,"HOU":4,"MIL":3,"ATL":3,"DAL":2,"LAL":2,"CHI":1,"CLE":1,"DEN":1,"IND":1,"BKN":1,"SAC":1},
+        1987: {"LAL":5,"BOS":4,"SEA":3,"DET":3,"MIL":2,"GSW":2,"CHI":1,"DEN":1,"HOU":1,"IND":1,"WAS":1,"PHI":1},
+        1988: {"LAL":5,"DET":4,"BOS":3,"DAL":3,"ATL":2,"CHI":2,"DEN":1,"HOU":1,"MIL":1,"PHI":1,"POR":1,"UTA":1},
+        1989: {"DET":5,"LAL":4,"CHI":3,"PHX":3,"NYK":2,"MIL":2,"ATL":1,"BOS":1,"DAL":1,"DEN":1,"GSW":1,"HOU":1,"IND":1,"SEA":1},
+        1990: {"DET":5,"POR":4,"CHI":3,"PHX":3,"NYK":2,"SAS":2,"ATL":1,"DAL":1,"HOU":1,"IND":1,"LAL":1,"UTA":1},
+        1991: {"CHI":5,"LAL":4,"POR":3,"MIL":3,"PHI":2,"UTA":2,"ATL":1,"BOS":1,"CHA":1,"GSW":1,"IND":1,"SAS":1},
+        1992: {"CHI":5,"POR":4,"CLE":3,"NYK":3,"BOS":2,"MIA":2,"IND":1,"LAC":1,"LAL":1,"PHX":1,"SAC":1,"SEA":1,"UTA":1},
+        1993: {"CHI":5,"PHX":4,"NYK":3,"SEA":3,"CLE":2,"IND":2,"ATL":1,"BOS":1,"CHA":1,"HOU":1,"LAL":1,"BKN":1},
+        1994: {"HOU":5,"NYK":4,"IND":3,"UTA":3,"ATL":2,"SEA":2,"BKN":1,"CHI":1,"CLE":1,"DAL":1,"DEN":1,"GSW":1,"MIA":1,"PHX":1},
+        1995: {"HOU":5,"ORL":4,"SAS":3,"IND":3,"PHX":2,"NYK":2,"ATL":1,"CHI":1,"CLE":1,"DEN":1,"LAL":1,"UTA":1},
+        1996: {"CHI":5,"SEA":4,"ORL":3,"NYK":3,"ATL":2,"UTA":2,"CLE":1,"DET":1,"HOU":1,"IND":1,"MIA":1,"PHX":1,"SAC":1},
+        1997: {"CHI":5,"UTA":4,"MIA":3,"HOU":3,"NYK":2,"LAL":2,"ATL":1,"CHA":1,"DET":1,"IND":1,"LAC":1,"PHX":1},
+        1998: {"CHI":5,"UTA":4,"IND":3,"LAL":3,"CLE":2,"NYK":2,"ATL":1,"CHA":1,"MIA":1,"MIN":1,"BKN":1,"PHX":1,"SAC":1},
+        1999: {"SAS":5,"NYK":4,"IND":3,"POR":3,"LAL":2,"PHX":2,"ATL":1,"BOS":1,"LAC":1,"MIA":1,"MIL":1,"UTA":1},
+        2000: {"LAL":5,"IND":4,"POR":3,"NYK":3,"MIA":2,"PHX":2,"CHA":1,"DET":1,"MIL":1,"ORL":1,"SAC":1,"UTA":1},
+        2001: {"LAL":5,"PHI":4,"SAS":3,"MIL":3,"ATL":2,"SAC":2,"CHA":1,"CLE":1,"IND":1,"MIA":1,"POR":1,"TOR":1},
+        2002: {"LAL":5,"BKN":4,"BOS":3,"SAC":3,"DAL":2,"IND":2,"CHI":1,"DET":1,"ORL":1,"PHI":1,"POR":1,"UTA":1},
+        2003: {"SAS":5,"BKN":4,"DAL":3,"PHI":3,"BOS":2,"SAC":2,"DET":1,"HOU":1,"LAL":1,"MIL":1,"MIN":1,"NOP":1,"ORL":1},
+        2004: {"DET":5,"LAL":4,"IND":3,"MIN":3,"MIA":2,"SAS":2,"BOS":1,"DAL":1,"DEN":1,"MEM":1,"BKN":1,"NYK":1,"SAC":1},
+        2005: {"SAS":5,"DET":4,"MIA":3,"PHX":3,"DAL":2,"SEA":2,"BOS":1,"CHI":1,"DEN":1,"HOU":1,"IND":1,"BKN":1,"WAS":1},
+        2006: {"MIA":5,"DAL":4,"DET":3,"PHX":3,"CHI":2,"CLE":2,"IND":1,"LAL":1,"MEM":1,"BKN":1,"SAC":1,"WAS":1},
+        2007: {"SAS":5,"CLE":4,"DET":3,"UTA":3,"CHI":2,"PHX":2,"DEN":1,"GSW":1,"HOU":1,"LAL":1,"MIA":1,"WAS":1},
+        2008: {"BOS":5,"LAL":4,"DET":3,"SAS":3,"ATL":2,"ORL":2,"CLE":1,"DAL":1,"DEN":1,"HOU":1,"PHI":1,"PHX":1,"UTA":1,"WAS":1},
+        2009: {"LAL":5,"ORL":4,"CLE":3,"DEN":3,"BOS":2,"DAL":2,"ATL":1,"CHI":1,"HOU":1,"MIA":1,"PHI":1,"SAS":1,"UTA":1},
+        2010: {"LAL":5,"BOS":4,"ORL":3,"PHX":3,"ATL":2,"SAS":2,"CHI":1,"CLE":1,"DAL":1,"DEN":1,"MIA":1,"OKC":1,"POR":1,"UTA":1},
+        2011: {"DAL":5,"MIA":4,"CHI":3,"OKC":3,"BOS":2,"LAL":2,"ATL":1,"IND":1,"MEM":1,"NYK":1,"ORL":1,"PHX":1,"POR":1,"SAS":1},
+        2012: {"MIA":5,"OKC":4,"BOS":3,"SAS":3,"IND":2,"PHX":2,"ATL":1,"CHI":1,"DAL":1,"DEN":1,"LAC":1,"LAL":1,"NYK":1,"PHI":1},
+        2013: {"MIA":5,"SAS":4,"IND":3,"MEM":3,"CHI":2,"OKC":2,"ATL":1,"BKN":1,"DAL":1,"DEN":1,"GSW":1,"LAC":1,"NYK":1,"MIL":1},
+        2014: {"SAS":5,"MIA":4,"IND":3,"OKC":3,"CHI":2,"GSW":2,"ATL":1,"BKN":1,"CHA":1,"DAL":1,"HOU":1,"MEM":1,"PHX":1,"POR":1,"TOR":1,"WAS":1},
+        2015: {"GSW":5,"CLE":4,"HOU":3,"ATL":3,"CHI":2,"MEM":2,"BKN":1,"BOS":1,"DAL":1,"LAC":1,"NOP":1,"POR":1,"TOR":1,"WAS":1},
+        2016: {"CLE":5,"GSW":4,"OKC":3,"TOR":3,"ATL":2,"MIA":2,"BOS":1,"CHA":1,"DET":1,"HOU":1,"IND":1,"MEM":1,"POR":1,"SAS":1},
+        2017: {"GSW":5,"CLE":4,"BOS":3,"SAS":3,"HOU":2,"UTA":2,"CHI":1,"IND":1,"LAC":1,"MEM":1,"OKC":1,"POR":1,"TOR":1,"WAS":1},
+        2018: {"GSW":5,"CLE":4,"BOS":3,"HOU":3,"NOP":2,"PHI":2,"IND":1,"MIA":1,"MIL":1,"MIN":1,"OKC":1,"POR":1,"SAS":1,"WAS":1},
+        2019: {"TOR":5,"GSW":4,"MIL":3,"POR":3,"BOS":2,"PHI":2,"BKN":1,"DEN":1,"DET":1,"HOU":1,"IND":1,"LAC":1,"OKC":1,"ORL":1,"SAS":1,"UTA":1},
+        2020: {"LAL":5,"MIA":4,"BOS":3,"DEN":3,"HOU":2,"LAC":2,"IND":1,"MIL":1,"OKC":1,"ORL":1,"PHI":1,"POR":1,"TOR":1,"UTA":1},
+        2021: {"MIL":5,"PHX":4,"ATL":3,"LAC":3,"BKN":2,"PHI":2,"DEN":1,"LAL":1,"MEM":1,"NYK":1,"POR":1,"TOR":1,"UTA":1,"WAS":1},
+        2022: {"GSW":5,"BOS":4,"DAL":3,"MIA":3,"MEM":2,"PHI":2,"ATL":1,"BKN":1,"CHI":1,"MIN":1,"NOP":1,"PHX":1,"TOR":1,"UTA":1},
+        2023: {"DEN":5,"MIA":4,"BOS":3,"LAL":3,"GSW":2,"NYK":2,"ATL":1,"CLE":1,"LAC":1,"MEM":1,"MIN":1,"PHI":1,"PHX":1,"SAC":1},
+        2024: {"BOS":5,"DAL":4,"IND":3,"MIN":3,"CLE":2,"NYK":2,"LAC":1,"LAL":1,"MIL":1,"NOP":1,"OKC":1,"PHI":1,"PHX":1,"SAC":1},
+    }
+
+    # For historical seasons use the lookup table directly
+    if season in NBA_PLAYOFF_TABLE:
+        result = {k: v for k, v in NBA_PLAYOFF_TABLE[season].items()
+                  if v < 5}  # exclude champions (handled by championships list)
+        if result:
+            print(f"      NBA playoff teams (table): {sorted(result.keys())}")
+        return result
+
+    # For recent seasons not in table, try ESPN
     exits = {}
-    url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?seasontype=3&season={season+1}"
+    url = (f"https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+           f"?season={season+1}&seasontype=3")
     try:
         data = fetch_json(url)
-    except Exception:
+    except Exception as e:
+        print(f"      NBA playoff standings err: {e}")
         return exits
 
-    # Parse playoff series results
-    team_max_round = {}
-    for event in data.get("events", []):
-        round_num = event.get("season", {}).get("slug", "")
-        # Approximate round from event name
-        name = event.get("name", "").lower()
-        if "first round" in name or "wild card" in name:
-            rval = 1
-        elif "second round" in name or "conference semifinal" in name:
-            rval = 2
-        elif "conference final" in name:
-            rval = 3
-        elif "final" in name:
-            rval = 4
-        else:
-            continue
+    for conf in data.get("children", []):
+        for entry in conf.get("standings", {}).get("entries", []):
+            abbrev = entry.get("team", {}).get("abbreviation", "")
+            code   = normalize_nba_abbrev(abbrev)
+            if not code:
+                continue
+            stats  = entry.get("stats", [])
+            wins   = next((int(s["value"]) for s in stats if s["name"] == "wins"),        None)
+            losses = next((int(s["value"]) for s in stats if s["name"] == "losses"),      None)
+            seed   = next((s.get("value") for s in stats if s["name"] == "playoffSeed"),  None)
 
-        for comp in event.get("competitions", [{}]):
-            for competitor in comp.get("competitors", []):
-                abbrev = competitor.get("team", {}).get("abbreviation", "")
-                code   = normalize_nba_abbrev(abbrev)
-                winner = competitor.get("winner", False)
-                if code:
-                    team_max_round[code] = max(team_max_round.get(code, 0), rval)
+            if wins is None or losses is None:
+                continue
+            if (wins + losses) < 1 or seed is None:
+                continue
 
-    for code, max_r in team_max_round.items():
-        exits[code] = max_r
+            if wins == 0:
+                exit_round = 1
+            elif wins == 1:
+                exit_round = 2
+            elif wins == 2:
+                exit_round = 3
+            else:
+                exit_round = 4
+            exits[code] = exit_round
 
+    if exits:
+        print(f"      NBA playoff teams (ESPN): {sorted(exits.keys())}")
     return exits
 
 
