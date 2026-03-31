@@ -37,6 +37,15 @@ DATA_DIR.mkdir(exist_ok=True)
 CURRENT_YEAR = datetime.now().year
 RATE_LIMIT_DELAY = 0.4   # seconds between requests
 
+# Last COMPLETED season per league (update annually after each league's finals)
+# NFL: season year = year playoffs concluded (e.g. 2024 = Super Bowl LIX, Feb 2025)
+# NBA/NHL: season year = year playoffs started (e.g. 2024 = 2023-24 season, ended June 2024)
+# MLB: season year = year World Series was played
+NFL_LAST_COMPLETED = 2025   # Super Bowl LIX Feb 2026: SEA beat NE
+NBA_LAST_COMPLETED = 2024   # 2024-25 season still in progress as of March 2026
+MLB_LAST_COMPLETED = 2024   # 2025 season hasn't started yet
+NHL_LAST_COMPLETED = 2024   # 2024-25 season still in progress as of March 2026
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -157,11 +166,11 @@ MLB_CHAMPIONSHIPS = {
     "SF":  [1954, 2010, 2012, 2014],
     "STL": [1926, 1931, 1934, 1942, 1944, 1946, 1964, 1967, 1982, 2006, 2011],
     "TB":  [],
-    "TEX": [],
+    "TEX": [2023],
     "TOR": [1992, 1993],
     "MIN": [1924, 1987, 1991],
     "PHI": [1929, 1930, 1980, 2008],
-    "ATL": [1914, 1957, 1995],
+    "ATL": [1914, 1957, 1995, 2021],
     "CWS": [1906, 1917, 2005],
     "MIA": [1997, 2003],
     "NYY": [1923,1927,1928,1932,1936,1937,1938,1939,1941,1943,1947,1949,1950,1951,1952,1953,1956,1958,1961,1962,1977,1978,1996,1998,1999,2000,2009],
@@ -177,7 +186,7 @@ MLB_CHAMPIONSHIPS = {
     "DET": [1935, 1945, 1968, 1984],
     "HOU": [2017, 2022],
     "KC":  [1985, 2015],
-    "LAD": [1955,1959,1963,1965,1981,1988,2020],
+    "LAD": [1955,1959,1963,1965,1981,1988,2020,2024],
     "WAS": [1924, 2019],
     "NYM": [1969, 1986],
 }
@@ -237,7 +246,7 @@ def fetch_mlb(since_year=1969):
                     teams_out[code]["seasons"][yr] = s
 
     # Pull season records from the API year by year
-    end_year = CURRENT_YEAR - 1  # last completed season
+    end_year = MLB_LAST_COMPLETED
 
     for season in range(since_year, end_year + 1):
         print(f"  MLB {season}...", end=" ", flush=True)
@@ -497,13 +506,13 @@ NHL_FINALS_LOSSES = {
     "CHI": [1931,1944,1971,1973,1992],
     "COL": [2001],  # already a champ, but 1994 loss as Nordiques not tracked
     "CBJ": [],
-    "DAL": [2000],
+    "DAL": [2000, 2020],
     "DET": [1934,1942,1945,1948,1956,1961,1963,1964,1966,1995,2009],
     "EDM": [1983,2006],
     "FLA": [1996,2023],
     "LAK": [1993],
     "MIN": [],
-    "MTL": [1947,1952,1954,1955,1967,1989],
+    "MTL": [1947,1952,1954,1955,1967,1989,2021],
     "NSH": [2017],
     "NJD": [2001],
     "NYI": [1975],
@@ -514,7 +523,7 @@ NHL_FINALS_LOSSES = {
     "STL": [1968,1969,1970],
     "SJS": [2016],
     "SEA": [],
-    "TBL": [2015],
+    "TBL": [2015, 2022],
     "TOR": [],
     "UTA": [],
     "VAN": [1982,1994,2011],
@@ -542,7 +551,7 @@ def fetch_nhl(since_year=1970):
                 if int(yr) < since_year:
                     teams_out[code]["seasons"][yr] = s
 
-    end_year = CURRENT_YEAR - 1
+    end_year = NHL_LAST_COMPLETED
 
     for season in range(since_year, end_year + 1):
         # NHL season ID format: 20232024 for the 2023-24 season
@@ -826,7 +835,7 @@ def fetch_nba(since_year=1970):
                 if int(yr) < since_year:
                     teams_out[code]["seasons"][yr] = s
 
-    end_year = CURRENT_YEAR - 1
+    end_year = NBA_LAST_COMPLETED
     nba_headers = {
         "Referer": "https://www.nba.com/",
         "Origin":  "https://www.nba.com",
@@ -1154,7 +1163,7 @@ NFL_CHAMPIONSHIPS = {
 }
 
 NFL_FINALS_LOSSES = {
-    "ARI": [2008, 2023],
+    "ARI": [2008],
     "ATL": [1998, 2016],
     "BAL": [1968, 1969],
     "BUF": [1990, 1991, 1992, 1993],
@@ -1207,7 +1216,7 @@ def fetch_nfl(since_year=1970):
                 if int(yr) < since_year:
                     teams_out[code]["seasons"][yr] = s
 
-    end_year = CURRENT_YEAR - 1
+    end_year = NFL_LAST_COMPLETED
 
     for season in range(since_year, end_year + 1):
         print(f"  NFL {season}...", end=" ", flush=True)

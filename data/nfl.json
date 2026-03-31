@@ -12,8 +12,7 @@
         1947
       ],
       "finals_losses": [
-        2008,
-        2023
+        2008
       ],
       "seasons": {
         "1966": {
@@ -285,8 +284,8 @@
           "l": 13,
           "t": 0,
           "g": 17,
-          "playoffs": true,
-          "exit": 4
+          "playoffs": false,
+          "exit": 0
         },
         "2024": {
           "w": 8,
