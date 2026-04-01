@@ -42,9 +42,9 @@ RATE_LIMIT_DELAY = 0.4   # seconds between requests
 # NBA/NHL: season year = year playoffs started (e.g. 2024 = 2023-24 season, ended June 2024)
 # MLB: season year = year World Series was played
 NFL_LAST_COMPLETED = 2025   # Super Bowl LIX Feb 2026: SEA beat NE
-NBA_LAST_COMPLETED = 2024   # 2024-25 season still in progress as of March 2026
-MLB_LAST_COMPLETED = 2024   # 2025 season hasn't started yet
-NHL_LAST_COMPLETED = 2024   # 2024-25 season still in progress as of March 2026
+NBA_LAST_COMPLETED = 2025   # 2024-25 season complete: OKC beat IND in Finals
+MLB_LAST_COMPLETED = 2025   # 2025 World Series complete: LAD beat TOR
+NHL_LAST_COMPLETED = 2025   # 2024-25 Stanley Cup complete: FLA beat EDM
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -186,7 +186,7 @@ MLB_CHAMPIONSHIPS = {
     "DET": [1935, 1945, 1968, 1984],
     "HOU": [2017, 2022],
     "KC":  [1985, 2015],
-    "LAD": [1955,1959,1963,1965,1981,1988,2020,2024],
+    "LAD": [1955,1959,1963,1965,1981,1988,2020,2024,2025],
     "WAS": [1924, 2019],
     "NYM": [1969, 1986],
 }
@@ -200,7 +200,7 @@ MLB_FINALS_LOSSES = {
     "STL": [1928, 1930, 1943, 1968, 1985, 1987, 2004],
     "TB":  [2008, 2020],
     "TEX": [2010, 2011, 2023],
-    "TOR": [],
+    "TOR": [2025],
     "MIN": [1965],
     "PHI": [1915, 1950, 1983, 1993],
     "ATL": [1958, 1991, 1992, 1996, 1999],
@@ -474,7 +474,7 @@ NHL_CHAMPIONSHIPS = {
     "DAL": [1999],
     "DET": [1936,1937,1943,1950,1952,1954,1955,1997,1998,2002,2008],
     "EDM": [1984,1985,1987,1988,1990],
-    "FLA": [2024],
+    "FLA": [2024, 2025],
     "LAK": [2012,2014],
     "MIN": [],
     "MTL": [1916,1924,1930,1931,1944,1946,1953,1956,1957,1958,1959,1960,1965,1966,1968,1969,1971,1973,1976,1977,1978,1979,1986,1993],
@@ -508,7 +508,7 @@ NHL_FINALS_LOSSES = {
     "CBJ": [],
     "DAL": [2000, 2020],
     "DET": [1934,1942,1945,1948,1956,1961,1963,1964,1966,1995,2009],
-    "EDM": [1983,2006],
+    "EDM": [1983,2006,2025],
     "FLA": [1996,2023],
     "LAK": [1993],
     "MIN": [],
@@ -771,7 +771,7 @@ NBA_CHAMPIONSHIPS = {
     "MIN": [],
     "NOP": [],
     "NYK": [1970,1973],
-    "OKC": [],
+    "OKC": [2025],
     "ORL": [],
     "PHI": [1955,1967,1983],
     "PHX": [],
@@ -795,7 +795,7 @@ NBA_FINALS_LOSSES = {
     "DET": [1988,2005],
     "GSW": [1964,2016,2019],
     "HOU": [1981,1986,1994],
-    "IND": [2000],
+    "IND": [2000, 2025],
     "LAC": [],
     "LAL": [1959,1962,1963,1965,1966,1968,1969,1970,1973,1983,1984,1989,2004,2008],
     "MEM": [],
@@ -817,7 +817,7 @@ NBA_FINALS_LOSSES = {
 }
 
 
-def fetch_nba(since_year=1970):
+def fetch_nba(since_year=1976):
     print("\n=== NBA ===")
     existing = load_existing("nba")
     teams_out = {}
@@ -836,6 +836,97 @@ def fetch_nba(since_year=1970):
                     teams_out[code]["seasons"][yr] = s
 
     end_year = NBA_LAST_COMPLETED
+
+    # -----------------------------------------------------------------------
+    # Static W-L records for 1976-1983 (ESPN API returns no data this far back)
+    # Format: season -> {team_code: (wins, losses)}
+    # Source: official NBA records, post ABA-NBA merger era
+    # Note: team codes that no longer exist map to their current franchise:
+    #   KAN = SAC (Kansas City Kings -> Sacramento Kings)
+    #   WSA = WAS (Washington Bullets -> Wizards)
+    #   SDC = LAC (San Diego Clippers -> LA Clippers)
+    #   NJN = BKN (New Jersey Nets -> Brooklyn)
+    #   NOJ = UTA (New Orleans Jazz -> Utah Jazz)
+    # -----------------------------------------------------------------------
+    NBA_STATIC_SEASONS = {
+        1976: {  # 1976-77, 22 teams, 82 games
+            "ATL":31, "BOS":44, "BKN":22, "BUF":30, "CHI":44, "CLE":43,
+            "DEN":50, "DET":44, "GSW":46, "HOU":49, "IND":36, "KAN":40,
+            "LAL":53, "MIL":30, "NOJ":35, "NYK":40, "PHI":53, "PHO":34,
+            "POR":49, "SAS":44, "SEA":40, "WAS":48,
+        },
+        1977: {  # 1977-78, 22 teams, 82 games
+            "ATL":41, "BOS":32, "BKN":24, "BUF":27, "CHI":40, "CLE":43,
+            "DEN":48, "DET":38, "GSW":43, "HOU":28, "IND":31, "KAN":31,
+            "LAL":45, "MIL":44, "NOJ":39, "NYK":43, "PHI":55, "PHO":49,
+            "POR":58, "SAS":52, "SEA":47, "WAS":44,
+        },
+        1978: {  # 1978-79, 22 teams, 82 games
+            "ATL":46, "BOS":29, "BKN":37, "CHI":31, "CLE":30, "DEN":47,
+            "DET":30, "GSW":38, "HOU":47, "IND":38, "KAN":48, "LAL":47,
+            "MIL":38, "NOJ":26, "NYK":31, "PHI":47, "PHO":50, "POR":45,
+            "SAS":48, "SDC":43, "SEA":52, "WAS":54,
+        },
+        1979: {  # 1979-80, 23 teams (Dallas expansion), 82 games
+            "ATL":50, "BOS":61, "BKN":34, "CHI":30, "CLE":37, "DAL":15,
+            "DEN":30, "DET":16, "GSW":24, "HOU":41, "IND":37, "KAN":47,
+            "LAL":60, "MIL":49, "NOJ":24, "NYK":39, "PHI":59, "PHO":55,
+            "POR":38, "SAS":41, "SDC":35, "SEA":56, "WAS":39,
+        },
+        1980: {  # 1980-81, 23 teams, 82 games
+            "ATL":31, "BOS":62, "BKN":24, "CHI":45, "CLE":28, "DAL":15,
+            "DEN":37, "DET":21, "GSW":39, "HOU":40, "IND":44, "KAN":40,
+            "LAL":54, "MIL":60, "NYK":50, "PHI":62, "PHO":57, "POR":45,
+            "SAS":52, "SDC":36, "SEA":34, "UTA":28, "WAS":39,
+        },
+        1981: {  # 1981-82, 23 teams, 82 games
+            "ATL":42, "BOS":63, "BKN":44, "CHI":34, "CLE":15, "DAL":28,
+            "DEN":46, "DET":39, "GSW":45, "HOU":46, "IND":35, "KAN":30,
+            "LAL":57, "MIL":55, "NYK":33, "PHI":58, "PHO":46, "POR":42,
+            "SAS":48, "SDC":17, "SEA":52, "UTA":25, "WAS":43,
+        },
+        1982: {  # 1982-83, 23 teams, 82 games
+            "ATL":43, "BOS":56, "BKN":47, "CHI":28, "CLE":23, "DAL":38,
+            "DEN":45, "DET":37, "GSW":30, "HOU":14, "IND":20, "KAN":45,
+            "LAL":58, "MIL":51, "NYK":44, "PHI":65, "PHO":53, "POR":46,
+            "SAS":53, "SDC":25, "SEA":48, "UTA":30, "WAS":42,
+        },
+        1983: {  # 1983-84, 23 teams, 82 games
+            "ATL":40, "BOS":62, "BKN":45, "CHI":27, "CLE":28, "DAL":43,
+            "DEN":38, "DET":49, "GSW":37, "HOU":29, "IND":26, "KAN":38,
+            "LAL":54, "MIL":50, "NYK":47, "PHI":52, "PHO":41, "POR":48,
+            "SAS":37, "SDC":30, "SEA":42, "UTA":45, "WAS":35,
+        },
+    }
+    # Losses = 82 - wins (all pre-1984 seasons were 82 games)
+    # Franchise code remaps for extinct teams
+    STATIC_REMAP = {"KAN":"SAC","WSA":"WAS","SDC":"LAC","NJN":"BKN","NOJ":"UTA","WAS":"WAS"}
+
+    for static_season, team_wins in NBA_STATIC_SEASONS.items():
+        if static_season < since_year:
+            continue
+        playoff_exits = fetch_nba_playoffs(static_season)
+        for raw_code, wins in team_wins.items():
+            code = STATIC_REMAP.get(raw_code, raw_code)
+            if code not in teams_out:
+                continue
+            losses = 82 - wins
+            champs   = teams_out[code]["championships"]
+            finals_l = teams_out[code]["finals_losses"]
+            if static_season in champs:
+                exit_round, playoffs = 5, True
+            elif static_season in finals_l:
+                exit_round, playoffs = 4, True
+            elif code in playoff_exits:
+                exit_round, playoffs = playoff_exits[code], True
+            else:
+                exit_round, playoffs = 0, False
+            teams_out[code]["seasons"][str(static_season)] = {
+                "w": wins, "l": losses, "t": 0, "g": 82,
+                "playoffs": playoffs, "exit": exit_round,
+            }
+        print(f"  NBA {static_season}-{static_season+1}... OK (static, {len(team_wins)} teams)")
+
     nba_headers = {
         "Referer": "https://www.nba.com/",
         "Origin":  "https://www.nba.com",
@@ -1016,6 +1107,16 @@ def fetch_nba_playoffs(season):
         2022: {"GSW":5,"BOS":4,"DAL":3,"MIA":3,"MEM":2,"PHI":2,"ATL":1,"BKN":1,"CHI":1,"MIN":1,"NOP":1,"PHX":1,"TOR":1,"UTA":1},
         2023: {"DEN":5,"MIA":4,"BOS":3,"LAL":3,"GSW":2,"NYK":2,"ATL":1,"CLE":1,"LAC":1,"MEM":1,"MIN":1,"PHI":1,"PHX":1,"SAC":1},
         2024: {"BOS":5,"DAL":4,"IND":3,"MIN":3,"CLE":2,"NYK":2,"LAC":1,"LAL":1,"MIL":1,"NOP":1,"OKC":1,"PHI":1,"PHX":1,"SAC":1},
+        2025: {"OKC":5,"IND":4,"NYK":3,"MIN":3,"BOS":2,"DEN":2,"ATL":1,"CLE":1,"DAL":1,"GSW":1,"LAL":1,"MEM":1,"MIA":1,"MIL":1,"PHI":1,"SAC":1},
+        # Pre-1984 seasons (post ABA-NBA merger 1976)
+        1976: {"POR":5,"PHI":4,"LAL":3,"HOU":3,"GSW":2,"DET":2,"BOS":1,"BUF":1,"CHI":1,"MIL":1,"WSA":1},
+        1977: {"WAS":5,"SEA":4,"PHI":3,"DEN":3,"ATL":2,"MIL":2,"CLE":1,"HOU":1,"IND":1,"LAL":1,"NJN":1,"PHO":1},
+        1978: {"SEA":5,"WAS":4,"PHO":3,"SAS":3,"LAL":2,"ATL":2,"DEN":1,"HOU":1,"IND":1,"KAN":1,"NJN":1,"PHI":1},
+        1979: {"LAL":5,"PHI":4,"BOS":3,"SEA":3,"HOU":2,"ATL":2,"CHI":1,"IND":1,"KAN":1,"MIL":1,"PHO":1,"POR":1},
+        1980: {"BOS":5,"HOU":4,"PHI":3,"MIL":3,"CHI":2,"PHO":2,"ATL":1,"IND":1,"KAN":1,"LAL":1,"NJN":1,"NYK":1},
+        1981: {"LAL":5,"PHI":4,"BOS":3,"SAS":3,"PHO":2,"MIL":2,"ATL":1,"DEN":1,"GSW":1,"HOU":1,"IND":1,"NJN":1,"NJN":1,"NYK":1,"SEA":1},
+        1982: {"PHI":5,"LAL":4,"BOS":3,"SAS":3,"MIL":2,"PHO":2,"ATL":1,"CHI":1,"DEN":1,"GSW":1,"IND":1,"NYK":1,"NJN":1,"SEA":1},
+        1983: {"BOS":5,"LAL":4,"MIL":3,"PHI":3,"ATL":2,"NYK":2,"BKN":1,"CHI":1,"DET":1,"DEN":1,"GSW":1,"IND":1,"KAN":1,"PHO":1,"SEA":1},
     }
 
     # For historical seasons use the lookup table directly
